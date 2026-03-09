@@ -1,21 +1,21 @@
 name: Build APK
-on: [push, pull_request]
+
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Build with Buildozer
-        # [주의] 대소문자(A, S)와 하이픈(-) 사이 공백 없음을 완벽히 교정함
-        uses: ArtemSerebrennkov/buildozer-action@v1
+        uses: ArtemSBulgakov/buildozer-action@v1
         with:
-          buildozer_version: master
-          python_version: 3.11
+          command: buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: package
+          name: apk
           path: bin/*.apk
