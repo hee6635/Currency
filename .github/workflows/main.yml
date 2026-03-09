@@ -9,8 +9,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
+      - name: Build APK
+        uses: Entepotenz/Buildozer-Action@v2
         with:
           command: buildozer android debug
 
