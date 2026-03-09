@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Final Build APK
 
 on:
   push:
@@ -9,57 +9,47 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout source
+    - name: Checkout
       uses: actions/checkout@v4
 
     - name: Install system dependencies
       run: |
         sudo apt update
+        # 1. 필수 부품 및 uuid 관련 모든 패키지를 강제로 다시 설치합니다.
+        sudo apt install --reinstall -y \
+          python3-pip build-essential git zip unzip \
+          openjdk-17-jdk autoconf libtool pkg-config m4 \
+          zlib1g-dev libncurses5-dev libncursesw5-dev \
+          libtinfo5 cmake libffi-dev libssl-dev \
+          uuid-dev libuuid1 liblzma-dev libsqlite3-dev libbz2-dev \
+          libreadline-dev libgdbm-dev libdb5.3-dev \
+          libexpat1-dev libgmp-dev libmpfr-dev libmpc-dev \
+          gawk python3-dev
 
-        sudo apt install -y \
-        python3-pip \
-        build-essential \
-        git zip unzip \
-        openjdk-17-jdk \
-        autoconf libtool pkg-config \
-        zlib1g-dev \
-        libncurses5-dev libncursesw5-dev \
-        libtinfo5 \
-        cmake \
-        libffi-dev \
-        libssl-dev \
-        uuid-dev \
-        liblzma-dev \
-        libsqlite3-dev \
-        libbz2-dev \
-        libreadline-dev \
-        libgdbm-dev \
-        libexpat1-dev \
-        libgmp-dev \
-        libmpfr-dev \
-        libmpc-dev \
-        tk-dev \
-        gawk \
-        python3-dev
-
-    - name: Install Python tools
+    - name: Install python tools
       run: |
         pip install --upgrade pip
-        pip install buildozer==1.5.0 cython==0.29.36
+        pip install "buildozer==1.5.0" "Cython==0.29.36"
 
     - name: Build APK
       run: |
-        rm -rf .buildozer
-
-        # Python build 문제 해결
-        export ac_cv_header_lzma_h=no
-        export ac_cv_lib_uuid_uuid_generate=no
-        export ac_cv_func_getgrent=no
-
-        buildozer android debug
+        # 2. 찌꺼기 삭제
+        rm -rf .buildozer/
+        
+        # 3. [비기] 라이브러리 위치를 직접 찾아내서 표준 경로로 강제 연결(Symlink)합니다.
+        UUID_LIB=$(find /usr/lib/x86_64-linux-gnu -name "libuuid.so" | head -n 1)
+        sudo ln -sf $UUID_LIB /usr/lib/libuuid.so
+        sudo ln -sf $UUID_LIB /usr/local/lib/libuuid.so
+        
+        # 4. 컴파일러에게 "여기도 뒤져보고 저기도 뒤져봐!"라고 모든 경로를 주입합니다.
+        export LDFLAGS="-L/usr/lib/x86_64-linux-gnu -L/usr/lib -L/usr/local/lib"
+        export LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:/usr/lib:/usr/local/lib"
+        export CPATH="/usr/include/x86_64-linux-gnu:/usr/include"
+        
+        buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: currency-apk
+        name: Vietnam_Currency_App
         path: bin/*.apk
