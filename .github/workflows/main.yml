@@ -1,21 +1,21 @@
 name: Build APK
-
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build APK
+      - name: Build with Buildozer
+        # 권한 오류가 적은 다른 안정적인 액션으로 교체합니다.
         uses: Entepotenz/Buildozer-Action@v2
         with:
-          command: buildozer android debug
+          buildozer_version: master
+          python_version: 3.11
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk
+          name: package
           path: bin/*.apk
