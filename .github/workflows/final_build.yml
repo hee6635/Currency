@@ -24,14 +24,14 @@ jobs:
     - name: Install python tools
       run: |
         pip install --upgrade pip
-        # Kivy와 가장 호환성이 좋은 특정 Cython 버전으로 강제 고정합니다.
-        pip install buildozer "Cython==0.29.33"
+        # Kivy와 가장 호환성이 좋은 Cython 0.29.33 버전으로 고정
+        pip install "buildozer==1.5.0" "Cython==0.29.33"
 
     - name: Build APK
       run: |
-        # 이전 실패 찌꺼기를 지우고, 혹시 모를 묻고 답하기(y/n)를 자동으로 넘깁니다.
+        # 이전 실패 찌꺼기 폴더를 삭제하고 깔끔하게 빌드 시작
         rm -rf .buildozer/
-        yes | buildozer -v android debug
+        buildozer -v android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
