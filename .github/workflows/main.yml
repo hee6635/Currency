@@ -8,7 +8,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build with Buildozer
-        # 💡 주소 대소문자(A, S)와 하이픈(-) 뒤 공백 없음을 꼭 확인하세요!
+        # [주의] 대소문자(A, S)와 하이픈(-) 사이 공백 없음을 완벽히 교정함
         uses: ArtemSerebrennkov/buildozer-action@v1
         with:
           buildozer_version: master
