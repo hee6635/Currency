@@ -6,9 +6,8 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,ttf
 version = 0.1
 
-# [중요] pyjnius와 hostpython3를 명시적으로 추가했습니다.
+# [중요] pyjnius와 hostpython3를 명시
 requirements = python3,kivy,requests,pyjnius,hostpython3
-
 icon.filename = %(source.dir)s/icon.png
 orientation = portrait
 android.permissions = INTERNET
