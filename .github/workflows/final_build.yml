@@ -15,6 +15,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt update
+        # 4가지 에러를 한 번에 잡기 위한 필수 패키지 총동원
         sudo apt install -y \
           python3-pip build-essential git zip unzip \
           openjdk-17-jdk autoconf libtool pkg-config \
@@ -22,18 +23,19 @@ jobs:
           libtinfo5 cmake libffi-dev libssl-dev \
           uuid-dev liblzma-dev libsqlite3-dev libbz2-dev \
           libreadline-dev libgdbm-dev libdb5.3-dev \
-          libexpat1-dev libgmp-dev libmpfr-dev libmpc-dev
+          libexpat1-dev libgmp-dev libmpfr-dev libmpc-dev \
+          tk-dev libgdbm-compat-dev
 
     - name: Install python tools
       run: |
         pip install --upgrade pip
-        # pyjnius 에러를 잡기 위해 가장 안정적인 Cython 버전을 사용합니다.
+        # jnius 에러 방지를 위해 Cython 버전을 0.29.36으로 유지
         pip install "buildozer==1.5.0" "Cython==0.29.36"
 
     - name: Build APK
       run: |
+        # [중요] .buildozer 폴더를 완전히 삭제해서 이전 에러 기록을 지웁니다.
         rm -rf .buildozer/
-        # 자동 응답 처리를 위해 한 번 더 설정 확인
         buildozer -v android debug
 
     - name: Upload APK
