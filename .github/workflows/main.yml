@@ -1,18 +1,18 @@
 name: Build APK
+
 on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Build with Buildozer
-        # 대소문자 충돌이 없는 검증된 경로로 교체했습니다.
-        uses: enetpotenz/buildozer-action@v1
+        uses: Entepotenz/Buildozer-Action@v2
         with:
-          buildozer_version: master
-          python_version: 3.11
+          command: buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
