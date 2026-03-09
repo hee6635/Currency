@@ -8,13 +8,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build with Buildozer
-        # 철자 주의: Entepotenz (E 대문자, n-t-e 순서)
-        uses: Entepotenz/buildozer-action@v1
+        # [주의] A와 S는 반드시 대문자여야 합니다!
+        uses: ArtemSerebrennkov/buildozer-action@v1
         with:
           buildozer_version: master
           python_version: 3.11
 
       - name: Upload APK
+        # 최신 v4 버전 (필수)
         uses: actions/upload-artifact@v4
         with:
           name: package
