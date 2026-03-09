@@ -5,16 +5,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4  # 최신 버전으로 업데이트
 
       - name: Build with Buildozer
-        uses: ArtemSerebrennkov/buildozer-action@v1
+        # 검증된 공식 빌드 액션으로 변경
+        uses: Entepotenz/buildozer-action@v1.2.3
         with:
           buildozer_version: master
           python_version: 3.11
 
       - name: Upload APK
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4  # v2 대신 v4 사용 (필수)
         with:
           name: package
           path: bin/*.apk
