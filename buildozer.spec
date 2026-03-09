@@ -3,44 +3,57 @@
 # 앱 이름
 title = 환율 계산기
 
-# 패키지 이름
+# 패키지 이름 (영문 소문자)
 package.name = vnc_calc
 
 # 패키지 도메인
 package.domain = org.test
 
-# 소스 코드 위치 (현재 디렉토리)
+# 소스 코드 위치
 source.dir = .
 
-# 빌드에 포함할 확장자 목록
+# 빌드에 포함할 확장자
 source.include_exts = py,png,jpg,kv,ttf
 
 # 앱 버전
 version = 0.1
 
-# 패키지 요구사항
+# 필수 라이브러리 (requests 포함)
 requirements = python3,kivy,requests
 
-# 방금 올려주신 멋진 아이콘 파일 적용
+# 아이콘 파일 설정 (저장소 최상단에 icon.png가 있어야 함)
 icon.filename = %(source.dir)s/icon.png
 
-# 화면 방향 설정 (세로 고정)
+# 화면 방향 (세로 고정)
 orientation = portrait
 
-# 안드로이드 권한 설정 (인터넷 사용)
+# 인터넷 권한 (환율 정보 가져오기용)
 android.permissions = INTERNET
 
-# 안드로이드 타겟 API 버전 (안정적인 33으로 고정)
-android.api = 33
+# --- 안드로이드 빌드 설정 ---
 
-# 안드로이드 최소 API 지원 버전
+# 타겟 API 및 최소 API (안정적인 버전)
+android.api = 33
 android.minapi = 21
 
-# 안드로이드 아키텍처 (64비트)
+# 빌드 아키텍처
 android.archs = arm64-v8a
 
-# 빌드 툴 버전 고정 (라이선스 에러 방지)
+# 빌드 툴 버전 고정
 android.build_tools_version = 33.0.1
 
-# 안드로이드 SDK 라이선스 자동 동의
+# 라이선스 자동 동의
 android.accept_sdk_license = True
+
+# --- 경로 에러(FileNotFoundError) 방지 설정 ---
+
+# python-for-android 소스 및 브랜치 설정
+p4a.branch = master
+p4a.source_dir = 
+
+# SDK/NDK 경로 자동 인식을 위해 비워둠
+android.sdk_path = 
+android.ndk_path = 
+
+# 빌드 시 찌꺼기 방지를 위한 로그 레벨 (문제가 생기면 2로 변경)
+log_level = 1
