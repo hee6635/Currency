@@ -3,22 +3,20 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 2026년 기준 가장 안정적인 최신 버전입니다
     steps:
-      # 1. 최신 버전의 체크아웃 사용 (v4)
       - uses: actions/checkout@v4
 
-      # 2. 공식 Kivy Buildozer Action 사용 (가장 안정적)
       - name: Build with Buildozer
-        uses: kivy/buildozer-action@master
+        # 공식 도구의 v1 버전을 명시하여 경로 문제를 해결합니다
+        uses: kivy/buildozer-action@v1
         with:
-          save_buildozer_cache: true
-          buildozer_version: master
           command: buildozer android debug
+          buildozer_version: master
 
-      # 3. 최신 버전의 업로드 기능 사용 (v4)
       - name: Upload APK
+        # 중단(Deprecated) 에러가 없는 최신 v4 버전입니다
         uses: actions/upload-artifact@v4
         with:
-          name: MyCalculator-APK
+          name: ExchangeApp-APK
           path: bin/*.apk
