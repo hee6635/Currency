@@ -3,7 +3,6 @@ on: [push]
 
 jobs:
   build:
-    # 22.04 환경이 안드로이드 SDK 빌드 도구와 가장 잘 맞습니다.
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -18,18 +17,19 @@ jobs:
           libgdbm-compat-dev libreadline-dev libnss3-dev libossp-uuid-dev \
           m4 libltdl-dev
 
-          pip3 install --user --upgrade Cython==0.29.33 buildozer
+          # [해결책] Cython 3.x 버전을 피하고 0.29.33을 설치합니다.
+          pip3 install --user --upgrade "Cython<3.0" buildozer
 
       - name: Build with Buildozer
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # 2026년 환경에서 AIDL 설치를 보장하기 위해 환경 변수를 주입합니다.
           export APP_ANDROID_ACCEPT_SDK_LICENSE=1
+          # 상세 로그 출력
           buildozer -v android debug
         shell: bash
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MyCalculator-APK
+          name: ExchangeApp-APK
           path: bin/*.apk
