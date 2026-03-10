@@ -10,7 +10,7 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
-from kivy.uix.image import AsyncImage
+from kivy.uix.image import Image  # 100% 오프라인 파일을 위해 Image 사용
 from kivy.uix.widget import Widget
 from kivy.core.window import Window
 from kivy.graphics import Color, RoundedRectangle, Line
@@ -18,12 +18,12 @@ from kivy.clock import Clock
 from kivy.uix.scrollview import ScrollView
 from kivy.core.clipboard import Clipboard
 
-# 1. 폰트 안전장치 (시스템 폰트가 없으면 로컬 NanumGothic 사용)
+# 1. 폰트 및 리소스 경로 설정 (오프라인 파일 우선)
 def get_safe_font():
     paths = ['/system/fonts/NotoSansCJK-Regular.ttc', '/system/fonts/DroidSansFallback.ttf']
     for p in paths:
         if os.path.exists(p): return p
-    return 'NanumGothic.ttf' # 폰트 깨짐 완벽 방지
+    return 'NanumGothic.ttf'
 
 K_FONT = get_safe_font()
 MAIN_BG, CARD_BG = (0.93, 0.94, 0.96, 1), (1, 1, 1, 1)
@@ -31,8 +31,9 @@ ACCENT_MINT, SOFT_BLUE = (0.35, 0.78, 0.7, 1), (0.4, 0.6, 0.85, 1)
 OP_DARK_BLUE, NUM_LIGHT_GRAY = (0.2, 0.3, 0.4, 1), (0.92, 0.93, 0.95, 1)
 TEXT_BLACK, BTN_ORANGE, MEMO_YELLOW = (0.15, 0.15, 0.18, 1), (1, 0.6, 0.3, 1), (1, 1, 0.88, 1)
 
-FLAG_VN, FLAG_KR = "https://flagcdn.com/w160/vn.png", "https://flagcdn.com/w160/kr.png"
-ICON_BACKSPACE = "https://img.icons8.com/material-outlined/100/333333/left.png"
+# 🔥 100% 오프라인 이미지 파일명 연결
+FLAG_VN, FLAG_KR = "vn.png", "kr.png"
+ICON_BACK = "back.png"
 
 Window.clearcolor = MAIN_BG
 
@@ -87,7 +88,7 @@ class CardInput(BoxLayout):
             Color(0.85, 0.88, 0.9, 0.5); self.line = Line(rounded_rectangle=(0,0,0,0, 25), width=1.1)
         self.bind(pos=self.update_rect, size=self.update_rect)
         label_box = BoxLayout(orientation='vertical', size_hint_x=0.22)
-        self.flag_img = AsyncImage(source=flag_url, size_hint_y=0.6)
+        self.flag_img = Image(source=flag_url, size_hint_y=0.6)
         self.name_label = Label(text=label_text, size_hint_y=0.4, font_size=26, bold=True, color=(0.4, 0.45, 0.5, 1), font_name=K_FONT)
         label_box.add_widget(self.flag_img); label_box.add_widget(self.name_label); self.add_widget(label_box)
         input_container = RelativeLayout(size_hint_x=0.78)
@@ -156,18 +157,6 @@ class QuickRatePopup(Popup):
         instance.rect.pos = instance.pos; instance.rect.size = instance.size
         instance.line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 20)
 
-class RateTextInput(TextInput):
-    def insert_text(self, substring, from_undo=False):
-        if substring not in "0123456789.": return
-        if substring == "." and "." in self.text: return
-        super().insert_text(substring, from_undo=from_undo); self.update_label_to_manual()
-    def do_backspace(self, from_undo=False, mode='bkspc'):
-        super().do_backspace(from_undo=from_undo, mode=mode); self.update_label_to_manual()
-    def update_label_to_manual(self):
-        app = App.get_running_app(); now = datetime.datetime.now().strftime("%y.%m.%d %H:%M")
-        app.update_label.text = f"{now} 수동 입력"
-        Clock.schedule_once(lambda dt: app.execute_calc(app.row1.input.text, app.row1.input), 0)
-
 class CommaTextInput(TextInput):
     def insert_text(self, substring, from_undo=False):
         if substring not in "0123456789.": return
@@ -185,23 +174,6 @@ class CommaTextInput(TextInput):
             app.execute_calc(formatted, self)
         except: pass
 
-class ThemeSavePopup(Popup):
-    def __init__(self, on_confirm, **kwargs):
-        super().__init__(**kwargs)
-        self.title, self.title_font, self.size_hint = "저장 확인", K_FONT, (0.8, 0.3)
-        self.separator_color, self.background = (0,0,0,0), ""
-        layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        with layout.canvas.before:
-            Color(*MAIN_BG); self.bg = RoundedRectangle(pos=layout.pos, size=layout.size, radius=[25,])
-        layout.bind(pos=lambda i,v: setattr(self.bg, 'pos', i.pos), size=lambda i,v: setattr(self.bg, 'size', i.size))
-        layout.add_widget(Label(text="수정한 메모를 저장할까요?", font_name=K_FONT, font_size=38, color=TEXT_BLACK))
-        btn_box = BoxLayout(spacing=20, size_hint_y=0.4)
-        cancel_btn = StyledButton(text="취소", bg_color=NUM_LIGHT_GRAY, f_size=32)
-        cancel_btn.bind(on_release=self.dismiss)
-        confirm_btn = StyledButton(text="저장하기", bg_color=ACCENT_MINT, f_size=32, t_color=(1,1,1,1))
-        confirm_btn.bind(on_release=lambda x: [on_confirm(), self.dismiss()])
-        btn_box.add_widget(cancel_btn); btn_box.add_widget(confirm_btn); layout.add_widget(btn_box); self.content = layout
-
 class CalculatorPopup(Popup):
     def __init__(self, main_app, target_row, **kwargs):
         super().__init__(**kwargs)
@@ -214,7 +186,6 @@ class CalculatorPopup(Popup):
         display_box = BoxLayout(orientation='vertical', size_hint_y=0.25, padding=[25, 15])
         with display_box.canvas.before:
             Color(1, 1, 1, 1); self.disp_rect = RoundedRectangle(pos=display_box.pos, size=display_box.size, radius=[20,])
-            Color(0.35, 0.78, 0.7, 0.2); self.disp_line = Line(rounded_rectangle=(0,0,0,0,20), width=1.5)
         display_box.bind(pos=self.update_disp_rect, size=self.update_disp_rect)
         self.formula = Label(text="", font_size=55, color=(0.4, 0.5, 0.5, 1), halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
         self.display = Label(text="", font_size=100, bold=True, color=TEXT_BLACK, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
@@ -225,7 +196,7 @@ class CalculatorPopup(Popup):
             ['7', NUM_LIGHT_GRAY], ['8', NUM_LIGHT_GRAY], ['9', NUM_LIGHT_GRAY], ['/', SOFT_BLUE],
             ['4', NUM_LIGHT_GRAY], ['5', NUM_LIGHT_GRAY], ['6', NUM_LIGHT_GRAY], ['*', SOFT_BLUE],
             ['1', NUM_LIGHT_GRAY], ['2', NUM_LIGHT_GRAY], ['3', NUM_LIGHT_GRAY], ['-', SOFT_BLUE],
-            ['C', (1, 0.88, 0.88, 1)], ['0', NUM_LIGHT_GRAY], ['BACKSPACE', NUM_LIGHT_GRAY], ['+', SOFT_BLUE],
+            ['C', (1, 0.88, 0.88, 1)], ['0', NUM_LIGHT_GRAY], ['BACK', NUM_LIGHT_GRAY], ['+', SOFT_BLUE],
             ['00', NUM_LIGHT_GRAY], ['000', NUM_LIGHT_GRAY], ['0000', NUM_LIGHT_GRAY], ['FLAG', (0.9, 0.94, 1, 1)]
         ]
         
@@ -233,20 +204,21 @@ class CalculatorPopup(Popup):
             f_layout = RelativeLayout()
             if txt == 'FLAG':
                 btn = StyledButton(bg_color=clr, radius=15)
-                self.pop_flag_img = AsyncImage(source=self.target_row.flag_img.source, size_hint=(0.7, 0.7), pos_hint={'center_x': 0.5, 'center_y': 0.5})
+                # 현재 계산중인 통화 국기 표시
+                self.pop_flag_img = Image(source=self.target_row.flag_img.source, size_hint=(0.7, 0.7), pos_hint={'center_x': 0.5, 'center_y': 0.5})
                 btn.bind(on_release=self.toggle_currency)
                 f_layout.add_widget(btn); f_layout.add_widget(self.pop_flag_img)
                 grid.add_widget(f_layout); continue
-                
-            if txt == 'BACKSPACE':
+            
+            if txt == 'BACK':
                 btn = StyledButton(bg_color=clr, radius=15)
-                img = AsyncImage(source=ICON_BACKSPACE, size_hint=(0.6, 0.6), pos_hint={'center_x': 0.5, 'center_y': 0.5})
+                # 🔥 지우기 버튼 이미지 (back.png) 정중앙 배치
+                img = Image(source=ICON_BACK, size_hint=(0.6, 0.6), pos_hint={'center_x': 0.5, 'center_y': 0.5})
                 btn.bind(on_release=lambda x: self.on_key_press('BACK'))
                 f_layout.add_widget(btn); f_layout.add_widget(img)
                 grid.add_widget(f_layout); continue
                 
-            t_color = OP_DARK_BLUE if txt in '/+*-' else TEXT_BLACK
-            btn = StyledButton(text=txt, bg_color=clr, radius=15, f_size=80 if len(txt)<2 else 50, t_color=t_color)
+            btn = StyledButton(text=txt, bg_color=clr, radius=15, f_size=80 if len(txt)<2 else 50)
             btn.bind(on_release=lambda x, t=txt: self.on_key_press(t))
             grid.add_widget(btn)
             
@@ -256,124 +228,98 @@ class CalculatorPopup(Popup):
         main_layout.add_widget(self.apply_btn); self.content = main_layout
         
     def update_bg(self, instance, value): self.bg_rect.pos, self.bg_rect.size = instance.pos, instance.size
-    def update_disp_rect(self, instance, value): self.disp_rect.pos, self.disp_rect.size = instance.pos, instance.size; self.disp_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 20)
+    def update_disp_rect(self, instance, value): self.disp_rect.pos, self.disp_rect.size = instance.pos, instance.size
     def toggle_currency(self, inst): self.main_app.swap(); self.target_row = self.main_app.row1; self.pop_flag_img.source = self.target_row.flag_img.source
     
     def on_key_press(self, key):
         curr_disp = self.display.text.replace(',', '')
-        curr_form = self.formula.text.replace(',', '')
-
-        if key == 'C':
-            self.formula.text, self.display.text = "", ""
+        if key == 'C': self.formula.text, self.display.text = "", ""
         elif key == 'BACK':
             if curr_disp:
                 new_v = curr_disp[:-1]
                 self.display.text = "{:,}".format(int(new_v)) if new_v else ""
-            elif curr_form:
-                parts = curr_form.strip().split(' ')
-                if parts:
-                    last = parts.pop()
-                    if last in '+-*/' and parts:
-                        self.display.text = parts.pop()
-                        self.formula.text = " ".join(parts) + " " if parts else ""
-                    else:
-                        self.formula.text = " ".join(parts)
         elif key in '+-*/':
             if curr_disp:
                 self.formula.text += "{:,}".format(int(curr_disp)) + " " + key + " "
                 self.display.text = ""
-            elif curr_form:
-                f_strip = curr_form.strip()
-                if f_strip and f_strip[-1] in '+-*/':
-                    self.formula.text = f_strip[:-1] + " " + key + " "
         else:
             if "=" in self.formula.text: self.formula.text, self.display.text = "", ""
             new_v = curr_disp + key
             if new_v.isdigit(): self.display.text = "{:,}".format(int(new_v))
-        
-        self.apply_btn.text = "연산 결과 확인" if self.formula.text and "=" not in self.formula.text else "금액 적용하기"
 
     def apply(self, inst):
         if self.formula.text and "=" not in self.formula.text:
             try:
-                expr = (self.formula.text + self.display.text).replace(',', ''); res = str(eval(expr)); res = res.split('.')[0] if '.' in res and res.split('.')[1] == '0' else res
-                self.formula.text += self.display.text + " ="; self.display.text = "{:,}".format(int(float(res))); self.apply_btn.text = "금액 적용하기"
-            except: self.display.text, self.formula.text = "Error", ""
+                expr = (self.formula.text + self.display.text).replace(',', ''); res = str(eval(expr))
+                self.formula.text += self.display.text + " ="; self.display.text = "{:,}".format(int(float(res)))
+            except: pass
         else:
             val = self.display.text.replace(',', '')
-            if val and (val.replace('.','',1).isdigit()):
-                formatted_val = "{:,}".format(int(float(val)))
-                self.target_row.input.text = formatted_val; self.main_app.execute_calc(formatted_val, self.target_row.input)
+            if val: self.target_row.input.text = "{:,}".format(int(float(val)))
             self.dismiss()
 
 class ExchangeRateApp(App):
     def build(self):
         self.is_swapped, self.is_updating = False, False
-        self.last_saved_memo = "여행 메모  (예시) \n1만동 = 약 550원\n5만동 = 약 2,800원\n\n오늘 할일\n야시장 가기"
         root = BoxLayout(orientation='vertical', padding=[25, 25], spacing=18)
-        root.add_widget(Label(text="환율 계산기", font_size=52, bold=True, size_hint_y=None, height=100, color=OP_DARK_BLUE, font_name=K_FONT))
-        self.row1 = CardInput(label_text="VND", flag_url=FLAG_VN); self.row2 = CardInput(label_text="KRW", flag_url=FLAG_KR)
+        root.add_widget(Label(text="환율 계산기", font_size=52, bold=True, size_hint_y=None, height=80, color=OP_DARK_BLUE, font_name=K_FONT))
+        
+        self.row1 = CardInput(label_text="VND", flag_url=FLAG_VN)
+        self.row2 = CardInput(label_text="KRW", flag_url=FLAG_KR)
         root.add_widget(self.row1); root.add_widget(self.row2)
-        ctrl_area = BoxLayout(orientation='vertical', size_hint_y=None, height=145)
+        
+        # 환율 및 조작 영역
         ctrl_box = BoxLayout(size_hint_y=None, height=100, spacing=15)
-        self.rate_in = RateTextInput(text="17.65", multiline=False, font_size=45, size_hint_x=0.35, halign='center', background_normal='', background_color=(0.9, 0.92, 0.95, 1), foreground_color=TEXT_BLACK, font_name=K_FONT, input_type='text')
-        live_btn = StyledButton(text="실시간", bg_color=ACCENT_MINT, size_hint_x=0.25, f_size=32, t_color=(1,1,1,1)); live_btn.bind(on_release=lambda x: self.get_rate())
-        swap_btn = StyledButton(text="⇅ 위치 변경", bg_color=SOFT_BLUE, size_hint_x=0.25, f_size=32, t_color=(1,1,1,1)); swap_btn.bind(on_release=lambda x: self.swap())
-        ctrl_box.add_widget(Label(text="환율", font_size=38, bold=True, size_hint_x=0.15, font_name=K_FONT, color=TEXT_BLACK)); ctrl_box.add_widget(self.rate_in); ctrl_box.add_widget(live_btn); ctrl_box.add_widget(swap_btn)
-        date_line = BoxLayout(size_hint_y=None, height=45); date_line.add_widget(Widget(size_hint_x=0.15))
-        now_time = datetime.datetime.now().strftime("%y.%m.%d %H:%M")
-        self.update_label = Label(text=f"{now_time} 기준", font_size=28, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT, size_hint_x=0.4, halign='center', valign='top')
-        self.update_label.bind(size=lambda l, s: setattr(l, 'text_size', s))
-        date_line.add_widget(self.update_label); date_line.add_widget(Widget(size_hint_x=0.45)); ctrl_area.add_widget(ctrl_box); ctrl_area.add_widget(date_line); root.add_widget(ctrl_area)
-        memo_container = BoxLayout(orientation='vertical', size_hint_y=1, padding=[5, 5])
+        self.rate_in = TextInput(text="18.00", multiline=False, font_size=45, size_hint_x=0.4, halign='center', font_name=K_FONT)
+        live_btn = StyledButton(text="실시간", bg_color=ACCENT_MINT, size_hint_x=0.3, f_size=32, t_color=(1,1,1,1))
+        live_btn.bind(on_release=lambda x: self.get_rate())
+        swap_btn = StyledButton(text="⇅ 위치 변경", bg_color=SOFT_BLUE, size_hint_x=0.3, f_size=28, t_color=(1,1,1,1))
+        swap_btn.bind(on_release=lambda x: self.swap())
+        ctrl_box.add_widget(Label(text="환율", font_size=32, bold=True, size_hint_x=0.15, font_name=K_FONT, color=TEXT_BLACK))
+        ctrl_box.add_widget(self.rate_in); ctrl_box.add_widget(live_btn); ctrl_box.add_widget(swap_btn)
+        root.add_widget(ctrl_box)
+        
+        # 메모장 영역
+        memo_container = BoxLayout(orientation='vertical', size_hint_y=1)
         with memo_container.canvas.before:
-            Color(*MEMO_YELLOW); self.memo_rect = RoundedRectangle(pos=(0,0), size=(0,0), radius=[25,])
-            Color(0.8, 0.78, 0.7, 0.5); self.memo_line = Line(rounded_rectangle=(0,0,0,0, 25), width=1.2)
-        memo_container.bind(pos=self.update_memo_design, size=self.update_memo_design)
-        memo_header = BoxLayout(orientation='horizontal', size_hint_y=None, height=85, padding=[15, 10], spacing=10)
-        quick_btn = StyledButton(text="퀵 환산", bg_color=SOFT_BLUE, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1))
-        quick_btn.bind(on_release=lambda x: QuickRatePopup(current_rate=float(self.rate_in.text if self.rate_in.text else 1)).open())
-        memo_header.add_widget(quick_btn); memo_header.add_widget(Label(text="MEMO", font_size=38, bold=True, color=OP_DARK_BLUE, font_name=K_FONT, halign='center', size_hint_x=0.5))
-        save_btn = StyledButton(text="저장", bg_color=ACCENT_MINT, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1)); save_btn.bind(on_release=lambda x: ThemeSavePopup(on_confirm=self.save_memo_direct).open())
-        memo_header.add_widget(save_btn); memo_container.add_widget(memo_header)
-        self.memo_input = TextInput(text=self.last_saved_memo, font_size=40, background_color=(0,0,0,0), foreground_color=TEXT_BLACK, padding=[30, 15], font_name=K_FONT, multiline=True, line_height=1.2, cursor_color=ACCENT_MINT)
+            Color(*MEMO_YELLOW); self.m_rect = RoundedRectangle(radius=[25,])
+        memo_container.bind(pos=lambda i,v: setattr(self.m_rect, 'pos', i.pos), size=lambda i,v: setattr(self.m_rect, 'size', i.size))
+        
+        m_head = BoxLayout(size_hint_y=None, height=70, padding=[10, 5], spacing=10)
+        q_btn = StyledButton(text="퀵 환산", bg_color=SOFT_BLUE, size_hint_x=0.3, f_size=26, radius=12, t_color=(1,1,1,1))
+        q_btn.bind(on_release=lambda x: QuickRatePopup(float(self.rate_in.text or 18)).open())
+        m_head.add_widget(q_btn); m_head.add_widget(Label(text="MEMO", font_name=K_FONT, color=TEXT_BLACK, size_hint_x=0.4, font_size=32, bold=True))
+        s_btn = StyledButton(text="저장", bg_color=ACCENT_MINT, size_hint_x=0.3, f_size=26, radius=12, t_color=(1,1,1,1))
+        m_head.add_widget(s_btn); memo_container.add_widget(m_head)
+        
+        self.memo_input = TextInput(text="여행 메모...", background_color=(0,0,0,0), font_name=K_FONT, font_size=35, padding=[20, 10])
         memo_container.add_widget(self.memo_input); root.add_widget(memo_container)
-        main_calc_btn = StyledButton(text="계산기 열기", bg_color=BTN_ORANGE, size_hint_y=None, height=180, f_size=55, bold=True, radius=40, t_color=(1,1,1,1)); main_calc_btn.bind(on_release=lambda x: CalculatorPopup(self, self.row1).open())
-        root.add_widget(main_calc_btn); return root
-    
-    def clear_all_inputs(self, inst): 
-        try:
-            self.is_updating = True
-            self.row1.input.text = ""; self.row2.input.text = ""
-        finally: self.is_updating = False
+        
+        main_calc_btn = StyledButton(text="계산기 열기", bg_color=BTN_ORANGE, size_hint_y=None, height=150, f_size=50, bold=True, radius=30, t_color=(1,1,1,1))
+        main_calc_btn.bind(on_release=lambda x: CalculatorPopup(self, self.row1).open())
+        root.add_widget(main_calc_btn)
+        return root
 
-    def execute_calc(self, value, source_input):
-        if self.is_updating or not value or value == ".": return
-        try:
-            r_text = self.rate_in.text
-            if not r_text or r_text == ".": return
-            r, v = float(r_text), float(value.replace(',', ''))
-            is_row1 = (source_input == self.row1.input)
-            res = (v / r if not self.is_swapped else v * r) if is_row1 else (v * r if not self.is_swapped else v / r)
-            target_input = self.row2.input if is_row1 else self.row1.input
-            self.is_updating = True; target_input.text = f"{int(res):,}"; self.is_updating = False
-        except: self.is_updating = False
-    def on_start(self): Clock.schedule_once(lambda dt: self.get_rate(), 0.5)
-    def update_memo_design(self, instance, value):
-        self.memo_rect.pos, self.memo_rect.size = instance.pos, instance.size; self.memo_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 25)
-    def save_memo_direct(self): self.last_saved_memo = self.memo_input.text
     def swap(self):
-        self.is_updating = True; v1, v2 = self.row1.input.text, self.row2.input.text; self.is_swapped = not self.is_swapped
+        self.is_updating = True; self.is_swapped = not self.is_swapped
         if self.is_swapped: self.row1.name_label.text, self.row1.flag_img.source, self.row2.name_label.text, self.row2.flag_img.source = "KRW", FLAG_KR, "VND", FLAG_VN
         else: self.row1.name_label.text, self.row1.flag_img.source, self.row2.name_label.text, self.row2.flag_img.source = "VND", FLAG_VN, "KRW", FLAG_KR
-        self.row1.input.text, self.row2.input.text = v2, v1; self.is_updating = False
-    def get_rate(self):
+        self.is_updating = False
+
+    def execute_calc(self, value, source_input):
+        if self.is_updating or not value: return
         try:
-            data = requests.get("https://open.er-api.com/v6/latest/KRW", timeout=5).json()
-            if data['result'] == 'success':
-                self.rate_in.text = f"{data['rates']['VND']:.2f}"; now = datetime.datetime.now().strftime("%y.%m.%d %H:%M")
-                self.update_label.text = f"{now} 기준"; self.execute_calc(self.row1.input.text, self.row1.input) if self.row1.input.text else None
+            rate = float(self.rate_in.text or 18); val = float(value.replace(',', ''))
+            is_row1 = (source_input == self.row1.input)
+            res = (val / rate if not self.is_swapped else val * rate) if is_row1 else (val * rate if not self.is_swapped else val / rate)
+            target = self.row2.input if is_row1 else self.row1.input
+            self.is_updating = True; target.text = "{:,}".format(int(res)); self.is_updating = False
         except: pass
 
-if __name__ == "__main__":
-    ExchangeRateApp().run()
+    def get_rate(self):
+        try:
+            data = requests.get("https://open.er-api.com/v6/latest/KRW", timeout=3).json()
+            if data['result'] == 'success': self.rate_in.text = f"{data['rates']['VND']:.2f}"
+        except: pass
+
+if __name__ == "__main__": ExchangeRateApp().run()
