@@ -3,16 +3,22 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      # 1. 최신 버전의 체크아웃 사용 (v4)
+      - uses: actions/checkout@v4
+
+      # 2. 공식 Kivy Buildozer Action 사용 (가장 안정적)
       - name: Build with Buildozer
-        uses: ArtemSerebriennikov/buildozer-action@v1
+        uses: kivy/buildozer-action@master
         with:
+          save_buildozer_cache: true
           buildozer_version: master
           command: buildozer android debug
+
+      # 3. 최신 버전의 업로드 기능 사용 (v4)
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: MyCalculator
+          name: MyCalculator-APK
           path: bin/*.apk
