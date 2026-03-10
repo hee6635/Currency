@@ -3,20 +3,36 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-24.04  # 2026년 기준 가장 안정적인 최신 버전입니다
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build with Buildozer
-        # 공식 도구의 v1 버전을 명시하여 경로 문제를 해결합니다
-        uses: kivy/buildozer-action@v1
+      - name: Get Date
+        id: get-date
+        run: |
+          echo "date=$(date -u +'%Y%m%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Cache Buildozer
+        uses: actions/cache@v4
         with:
-          command: buildozer android debug
-          buildozer_version: master
+          path: .buildozer
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}-${{ steps.get-date.outputs.date }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev python3-dev python3-pip python3-setuptools build-essential libsqlite3-dev sqlite3 bzip2 libbz2-dev liblzma-dev libgdbm-dev libgdbm-compat-dev libreadline-dev libnss3-dev libossp-uuid-dev
+          pip3 install --user --upgrade Cython==0.29.33 buildozer
+
+      - name: Build with Buildozer
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          buildozer android debug
+        shell: bash
 
       - name: Upload APK
-        # 중단(Deprecated) 에러가 없는 최신 v4 버전입니다
         uses: actions/upload-artifact@v4
         with:
-          name: ExchangeApp-APK
+          name: VietnamExchange-APK
           path: bin/*.apk
