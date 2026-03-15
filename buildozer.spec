@@ -1,5 +1,5 @@
 [app]
-title = 환율 계산기
+title = 베트남 환율
 package.name = vn_krw_calc
 package.domain = org.myapp
 
