@@ -27,14 +27,13 @@ ICON_SET = "set.png"
 IMAGE_HERB = "herb.png"    
 FLAG_VN = "vn.png"        
 FLAG_KR = "kr.png"        
-ICON_BACKSPACE = "back.png"  # 🔥 icon.png에서 back.png로 변경!
+ICON_BACKSPACE = "back.png"  
 ICON_CLEAR = "x.png"       
 
 def load_data():
     default_data = {
         "rate": "", 
         "memo": "여행 메모  (예시) \n1만동 = 약 550원\n5만동 = 약 2,800원\n\n오늘 할일\n야시장 가기",
-        # 🔥 auto_update의 기본값을 True로 변경하여 처음 설치 시 자동 작동!
         "settings": {"auto_update": True, "auto_zeros": False, "round_krw": False, "auto_font": False, "theme": 1}
     }
     if os.path.exists(DATA_FILE):
@@ -154,7 +153,9 @@ class ThemePillSwitch(ButtonBehavior, Widget):
         target_x = self.x + 5 + (self.theme_id - 1) * gap
         Animation(pos=(target_x, self.y + 5), t='out_quad', duration=0.2).start(self.thumb_circle)
         Animation(rgba=self.get_theme_color(self.theme_id), t='out_quad', duration=0.2).start(self.thumb_color)
-        self.main_app.change_theme(self.theme_id)
+        
+        # 미리보기만 적용
+        self.main_app.apply_theme_ui(self.theme_id)
 
 class PillSwitch(ButtonBehavior, Widget):
     active = BooleanProperty(False)
@@ -278,14 +279,24 @@ class SettingsPopup(ModalView):
         self.main_app = main_app
         self.size_hint = (1, 1) 
         self.background = ""; self.background_color = (1, 1, 1, 1) 
+        
+        self.original_theme = self.main_app.settings.get("theme", 1)
+        self.is_saved = False
+        self.bind(on_dismiss=self.on_cancel)
+        
         main_layout = BoxLayout(orientation='vertical')
         header = RelativeLayout(size_hint_y=None, height=130)
         with header.canvas.before: Color(1,1,1,1); Rectangle(pos=(0,0), size=Window.size)
-        x_btn = ImageButton(source=ICON_CLEAR, size_hint=(None, None), size=(60, 60), pos_hint={'x': 0.05, 'center_y': 0.5})
-        x_btn.bind(on_release=self.save_and_close)
+        
+        # 🔥 취소 버튼은 삭제하고, 타이틀과 저장 버튼만 남깁니다.
         title = Label(text="설정", font_size=42, bold=True, color=TEXT_BLACK, font_name=K_FONT, pos_hint={'center_x': 0.5, 'center_y': 0.5})
-        header.add_widget(x_btn); header.add_widget(title); main_layout.add_widget(header)
+        
+        self.save_btn = TextButton(text="저장", font_size=36, color=self.main_app.c_main, bold=True, size_hint=(None, None), size=(120, 100), pos_hint={'right': 0.95, 'center_y': 0.5}, font_name=K_FONT)
+        self.save_btn.bind(on_release=self.save_and_close)
+        
+        header.add_widget(title); header.add_widget(self.save_btn); main_layout.add_widget(header)
         with main_layout.canvas.after: Color(0.9, 0.9, 0.9, 1); Line(points=[0, Window.height-130, Window.width, Window.height-130], width=1)
+        
         scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
         list_grid = GridLayout(cols=1, size_hint_y=None, spacing=10)
         list_grid.bind(minimum_height=list_grid.setter('height'))
@@ -296,7 +307,6 @@ class SettingsPopup(ModalView):
         self.theme_sw = ThemePillSwitch(main_app=self.main_app, pos_hint={'right': 0.98, 'center_y': 0.5})
         theme_row.add_widget(theme_lbl); theme_row.add_widget(self.theme_sw); list_grid.add_widget(theme_row)
         
-        # 🔥 햅틱 효과 설정 삭제
         s_list = [("auto_update", "시작 시 환율 자동 업데이트"), ("auto_zeros", "VND 입력 시 000 생략 (K)"), ("round_krw", "KRW 100원 단위 반올림"), ("auto_font", "금액 길이에 맞춰 폰트 자동 조절")]
         for k, t in s_list:
             row = UnderlineLayout(size_hint_y=None, height=120)
@@ -311,12 +321,20 @@ class SettingsPopup(ModalView):
         self.add_widget(main_layout)
         
     def save_and_close(self, inst):
-        # 🔥 저장 시 햅틱 효과 항목 제거
-        for k in ["auto_update", "auto_zeros", "round_krw", "auto_font"]: self.main_app.settings[k] = getattr(self, f"sw_{k}").active
-        self.main_app.save_all_data(); self.main_app.update_ui_for_settings()
+        self.is_saved = True
+        for k in ["auto_update", "auto_zeros", "round_krw", "auto_font"]: 
+            self.main_app.settings[k] = getattr(self, f"sw_{k}").active
+        self.main_app.change_theme(self.theme_sw.theme_id) 
+        self.main_app.update_ui_for_settings()
         if self.main_app.row1.input.text: self.main_app.row1.input.format_and_calc()
         if self.main_app.row2.input.text: self.main_app.row2.input.format_and_calc()
         self.dismiss()
+
+    def on_cancel(self, inst):
+        if not self.is_saved:
+            if self.theme_sw.theme_id != self.original_theme:
+                self.main_app.apply_theme_ui(self.original_theme)
+
 
 class QuickRatePopup(ModalView):
     def __init__(self, current_rate, **kwargs):
@@ -338,7 +356,6 @@ class QuickRatePopup(ModalView):
         info = Label(text=f"현재 환율: {current_rate} 기준", font_size=32, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT, size_hint_y=None, height=80)
         main_layout.add_widget(info)
         
-        # 🔥 스크롤(스와이프)을 막아 화면에 딱 고정시킵니다.
         scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
         grid = GridLayout(cols=1, size_hint_y=None, spacing=0) 
         grid.bind(minimum_height=grid.setter('height'))
@@ -351,23 +368,21 @@ class QuickRatePopup(ModalView):
             else: krw = int((krw + 50) // 100) * 100
             self.calculated_data.append(f"{vnd:,}동 = {int(krw):,}원")
             
-            # 🔥 표 한 줄의 높이를 줄여서 한 화면에 다 들어가게 설정
             row = UnderlineLayout(size_hint_y=None, height=130)
-            # 🔥 글자와 화살표의 영역 비율(size_hint_x)을 명확히 나눠서 겹치지 않게 분리!
-            box = BoxLayout(orientation='horizontal', size_hint=(1, 1), spacing=10, padding=[20, 0])
             
-            vnd_lbl = Label(text=f"{vnd:,} ₫", font_name=K_FONT, font_size=50, bold=True, color=TEXT_BLACK, size_hint_x=0.42, halign='right', valign='middle')
+            box = BoxLayout(orientation='horizontal', size_hint=(1, 1), spacing=5, padding=[10, 0])
+            
+            vnd_lbl = Label(text=f"{vnd:,} ₫", font_name=K_FONT, font_size=46, bold=True, color=TEXT_BLACK, size_hint_x=0.40, halign='right', valign='middle')
             vnd_lbl.bind(size=vnd_lbl.setter('text_size'))
             
-            # 🔥 이미지 크기를 키우고 가운데 정렬 공간을 확보
-            arrow_box = RelativeLayout(size_hint_x=0.16)
-            arrow_img = FlippedBackImage(source=ICON_BACKSPACE, size_hint=(None, None), size=(55, 55), pos_hint={'center_x': 0.5, 'center_y': 0.5}, opacity=0.4)
-            arrow_box.add_widget(arrow_img)
+            # 🔥 이미지를 빼고, 크고 뚜렷한 텍스트 화살표(→)를 넣었습니다!
+            arrow_lbl = Label(text="→", font_name=K_FONT, font_size=55, color=(0.6, 0.6, 0.6, 1), size_hint_x=0.20, halign='center', valign='middle')
+            arrow_lbl.bind(size=arrow_lbl.setter('text_size'))
             
-            krw_lbl = Label(text=f"{int(krw):,} 원", font_name=K_FONT, font_size=47, color=app.c_text, size_hint_x=0.42, halign='left', valign='middle')
+            krw_lbl = Label(text=f"{int(krw):,} 원", font_name=K_FONT, font_size=44, color=app.c_text, size_hint_x=0.40, halign='left', valign='middle')
             krw_lbl.bind(size=krw_lbl.setter('text_size'))
             
-            box.add_widget(vnd_lbl); box.add_widget(arrow_box); box.add_widget(krw_lbl)
+            box.add_widget(vnd_lbl); box.add_widget(arrow_lbl); box.add_widget(krw_lbl)
             row.add_widget(box); grid.add_widget(row)
             
         grid.add_widget(Widget(size_hint_y=None, height=47))
@@ -484,26 +499,26 @@ class ExchangeRateApp(App):
         else:               
             self.c_main, self.c_sub, self.c_muted, self.c_memo, self.c_text = (0.25, 0.25, 0.25, 1), (0.55, 0.55, 0.55, 1), (0.7, 0.7, 0.7, 1), (0.95, 0.95, 0.95, 1), (0.1, 0.1, 0.1, 1)
 
-    def change_theme(self, theme_id):
-        self.settings["theme"] = theme_id
-        self.save_all_data()
+    def apply_theme_ui(self, theme_id):
         self.set_theme_colors(theme_id)
-
         self.title_lbl.color = self.c_text
         self.memo_title.color = self.c_text
         self.memo_rect_color.rgba = self.c_memo
         self.memo_line_color.rgba = [max(0, c - 0.1) for c in self.c_memo[:3]] + [0.5]
-
         self.live_btn.update_color(self.c_main if theme_id!=2 else self.c_sub) 
         self.swap_btn.update_color(self.c_muted)
         self.quick_btn.update_color(self.c_sub if theme_id!=2 else self.c_muted)
         self.save_btn.update_color(self.c_main if theme_id!=2 else self.c_sub)
         self.herb_btn.update_color(self.c_sub if theme_id!=2 else self.c_muted)
         self.main_calc_btn.update_color(self.c_main)
-
         self.memo_input.cursor_color = self.c_main
         self.row1.input.cursor_color = self.c_main
         self.row2.input.cursor_color = self.c_main
+
+    def change_theme(self, theme_id):
+        self.settings["theme"] = theme_id
+        self.save_all_data()
+        self.apply_theme_ui(theme_id)
 
     def build(self):
         self.is_swapped, self.is_updating = False, False; self.app_data = load_data(); self.settings = self.app_data["settings"]; self.last_saved_memo = self.app_data["memo"]; initial_rate = self.app_data["rate"]
@@ -630,7 +645,6 @@ class ExchangeRateApp(App):
         else: self.row1.name_label.text, self.row1.flag_img.source = "VND", FLAG_VN; self.row2.name_label.text, self.row2.flag_img.source = "KRW", FLAG_KR
         self.row1.input.text, self.row2.input.text = v2, v1; self.is_updating = False; self.update_ui_for_settings() 
         
-    # 🔥 앱이 시작할 때 자동 업데이트 기능 실행
     def on_start(self): 
         if self.settings.get("auto_update", True): 
             self.get_rate()
