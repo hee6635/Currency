@@ -90,10 +90,12 @@ class StyledButton(ButtonBehavior, Label):
         self.font_size, self.color, self.font_name, self.radius = f_size, t_color, K_FONT, [radius,]
         self.light_color = [min(1, c + 0.15) for c in bg_color[:3]] + [1]
         self.dark_color = [max(0, c - 0.15) for c in bg_color[:3]] + [1]
+        
         with self.canvas.before:
             self.shadow_dark = Color(*self.dark_color); self.rect_dark = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
             self.shadow_light = Color(*self.light_color); self.rect_light = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
             self.btn_color_obj = Color(*self.original_color); self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
+            
         self.bind(pos=self.update_rect, size=self.update_rect)
         
     def update_color(self, new_bg_color):
@@ -107,8 +109,10 @@ class StyledButton(ButtonBehavior, Label):
     def on_press(self):
         trigger_haptic()
         self.rect.pos = (self.pos[0] + 3, self.pos[1] - 3); self.shadow_light.a = 0; self.shadow_dark.a = 0
+        
     def on_release(self):
         self.rect.pos = self.pos; self.shadow_light.a = 1; self.shadow_dark.a = 1
+        
     def update_rect(self, *args):
         self.rect_dark.pos = (self.pos[0] + 4, self.pos[1] - 4); self.rect_dark.size = self.size
         self.rect_light.pos = (self.pos[0] - 4, self.pos[1] + 4); self.rect_light.size = self.size
@@ -204,21 +208,27 @@ class CommaTextInput(TextInput):
         app = App.get_running_app()
         if app.is_updating: return
         raw = self.text.replace(",", "").replace("K", "")
+        
+        target_font = 58
         if app.settings.get("auto_font", False):
-            if len(raw) > 11: self.font_size = 40
-            elif len(raw) > 8: self.font_size = 48
-            else: self.font_size = 58
-        else: self.font_size = 58
+            if len(raw) > 11: target_font = 40
+            elif len(raw) > 8: target_font = 48
+            
+        self.font_size = target_font 
+            
         if not raw: 
             app.is_updating = True; self.text = ""; app.is_updating = False
             app.execute_calc("", self); return
+            
         try:
             formatted = "{:,}".format(int(float(raw)))
             if self.k_mode: formatted += "K" 
+            
             if self.text != formatted:
                 app.is_updating = True; self.text = formatted; app.is_updating = False
                 if self.k_mode: self.cursor = (max(0, len(self.text) - 1), 0)
                 else: self.cursor = (len(self.text), 0)
+                
             app.execute_calc(raw, self)
         except: pass
 
@@ -248,11 +258,9 @@ class CardInput(BoxLayout):
             self.input.k_mode = is_active
             self.input.hint_text, self.name_label.text = ("000 생략", "VND (K)") if is_active else ("", "VND")
         else: 
-            # 🔥 버그 수정: KRW일 때는 hint_text를 확실하게 비워줍니다!
             self.input.k_mode = False
             self.name_label.text = "KRW"
             self.input.hint_text = ""  
-            
         if self.input.text: self.input.format_and_calc()
         
     def update_rect(self, *args):
@@ -291,7 +299,7 @@ class SettingsPopup(ModalView):
         title = Label(text="설정", font_size=42, bold=True, color=TEXT_BLACK, font_name=K_FONT, pos_hint={'center_x': 0.5, 'center_y': 0.5})
         header.add_widget(x_btn); header.add_widget(title); main_layout.add_widget(header)
         with main_layout.canvas.after: Color(0.9, 0.9, 0.9, 1); Line(points=[0, Window.height-130, Window.width, Window.height-130], width=1)
-        scroll = ScrollView(do_scroll_x=False)
+        scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
         list_grid = GridLayout(cols=1, size_hint_y=None, spacing=10)
         list_grid.bind(minimum_height=list_grid.setter('height'))
         
@@ -534,10 +542,46 @@ class ExchangeRateApp(App):
         self.memo_title = Label(text="MEMO", font_size=38, bold=True, color=self.c_text, font_name=K_FONT, halign='center', size_hint_x=0.5); memo_header.add_widget(self.memo_title); 
         self.save_btn = StyledButton(text="저장", bg_color=self.c_main if t_id!=2 else self.c_sub, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1)); self.save_btn.bind(on_release=lambda x: ThemeSavePopup(on_confirm=self.save_memo_direct).open()); memo_header.add_widget(self.save_btn); memo_container.add_widget(memo_header)
         
-        self.memo_input = TextInput(text=self.last_saved_memo, font_size=40, background_color=(0,0,0,0), foreground_color=TEXT_BLACK, padding=[30, 15], font_name=K_FONT, multiline=True, line_height=1.2, cursor_color=self.c_main); memo_container.add_widget(self.memo_input); root.add_widget(memo_container)
+        # 🔥 메모장을 ScrollView로 감싸서 스크롤바를 띄웠습니다!
+        self.memo_scroll = ScrollView(
+            do_scroll_x=False, 
+            do_scroll_y=True,
+            bar_width=25,                     # 스크롤바 두께 (터치하기 편하게 약간 도톰하게)
+            bar_margin=30,                    # 오른쪽 벽에서 30px 띄움 (떨어져 있는 느낌)
+            scroll_type=['bars', 'content'],  # 스크롤바 버튼 직접 잡고 끌기 허용!
+            bar_color=(0.5, 0.5, 0.5, 0.6),
+            bar_inactive_color=(0.6, 0.6, 0.6, 0.3),
+            size_hint=(1, 1)
+        )
+        
+        # 스크롤 안에 들어갈 텍스트 입력창
+        self.memo_input = TextInput(
+            text=self.last_saved_memo, 
+            font_size=40, 
+            background_color=(0,0,0,0), 
+            foreground_color=TEXT_BLACK, 
+            padding=[30, 15, 40, 15], # 글씨가 바에 가려지지 않게 우측 패딩 40으로 늘림
+            font_name=K_FONT, 
+            multiline=True, 
+            line_height=1.2, 
+            cursor_color=self.c_main,
+            size_hint_y=None # 스크롤뷰 안에 넣기 위한 필수 설정
+        )
+        
+        # 텍스트창 높이가 내용에 맞춰 자동으로 쭉쭉 늘어나게 연결
+        def update_memo_height(*args):
+            self.memo_input.height = max(self.memo_scroll.height, self.memo_input.minimum_height)
+            
+        self.memo_scroll.bind(height=update_memo_height)
+        self.memo_input.bind(minimum_height=update_memo_height)
+        
+        self.memo_scroll.add_widget(self.memo_input)
+        memo_container.add_widget(self.memo_scroll)
+        root.add_widget(memo_container)
+        
         bottom_box = BoxLayout(orientation='horizontal', size_hint_y=None, height=180, spacing=20)
         
-        self.herb_btn = StyledButton(text="고수 X", bg_color=self.c_sub if t_id!=2 else self.c_muted, size_hint_x=0.25, f_size=55, bold=True, radius=40, t_color=(1,1,1,1))
+        self.herb_btn = StyledButton(text="X고수", bg_color=self.c_sub if t_id!=2 else self.c_muted, size_hint_x=0.25, f_size=55, bold=True, radius=40, t_color=(1,1,1,1))
         self.herb_btn.bind(on_release=lambda x: HerbPopup().open())
         self.main_calc_btn = StyledButton(text="계산기 열기", bg_color=self.c_main, size_hint_x=0.75, f_size=55, bold=True, radius=40, t_color=(1,1,1,1))
         self.main_calc_btn.bind(on_release=lambda x: CalculatorPopup(self, self.row1).open())
@@ -546,11 +590,15 @@ class ExchangeRateApp(App):
         Clock.schedule_once(lambda dt: self.update_ui_for_settings(), 0); return root
         
     def save_all_data(self): self.app_data["rate"] = self.rate_in.text; self.app_data["memo"] = self.memo_input.text; self.app_data["settings"] = self.settings; save_data(self.app_data)
+    
     def save_memo_direct(self): self.last_saved_memo = self.memo_input.text; self.save_all_data()
+    
     def update_ui_for_settings(self): is_auto_zeros = self.settings.get("auto_zeros", False); self.row1.set_auto_zero_mode(is_auto_zeros); self.row2.set_auto_zero_mode(is_auto_zeros)
+    
     def clear_all_inputs(self, inst): 
         try: self.is_updating = True; self.row1.input.text = ""; self.row2.input.text = ""
         finally: self.is_updating = False
+        
     def execute_calc(self, value, source_input):
         if self.is_updating: return
         is_row1 = (source_input == self.row1.input); target_input = self.row2.input if is_row1 else self.row1.input
@@ -570,21 +618,30 @@ class ExchangeRateApp(App):
             else: target_input.text = f"{int(display_res):,}"
             self.is_updating = False
         except: self.is_updating = False
-    def on_start(self): 
-        if self.settings.get("auto_update", False): self.get_rate()
-    def update_memo_design(self, instance, value): self.memo_rect.pos, self.memo_rect.size = instance.pos, instance.size; self.memo_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 25)
+        
+    def update_memo_design(self, instance, value): 
+        self.memo_rect.pos, self.memo_rect.size = instance.pos, instance.size
+        self.memo_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 25)
+        
     def swap(self):
         self.is_updating = True; v1, v2 = self.row1.input.text, self.row2.input.text; self.is_swapped = not self.is_swapped
         if self.is_swapped: self.row1.name_label.text, self.row1.flag_img.source = "KRW", FLAG_KR; self.row2.name_label.text, self.row2.flag_img.source = "VND", FLAG_VN
         else: self.row1.name_label.text, self.row1.flag_img.source = "VND", FLAG_VN; self.row2.name_label.text, self.row2.flag_img.source = "KRW", FLAG_KR
         self.row1.input.text, self.row2.input.text = v2, v1; self.is_updating = False; self.update_ui_for_settings() 
+        
+    def on_start(self): 
+        if self.settings.get("auto_update", False): self.get_rate()
+        
     def get_rate(self):
         try:
-            data = requests.get("https://open.er-api.com/v6/latest/KRW", timeout=5).json()
+            data = requests.get("https://open.er-api.com/v6/latest/KRW", timeout=3).json() 
             if data['result'] == 'success':
                 self.rate_in.text = f"{data['rates']['VND']:.2f}"; now = datetime.datetime.now().strftime("%y.%m.%d %H:%M"); self.update_label.text = f"{now} 기준"; self.save_memo_direct()
                 if self.row1.input.text: self.execute_calc(self.row1.input.text, self.row1.input)
-        except: pass
+            else:
+                self.update_label.text = "업데이트 실패 (서버 오류)"
+        except: 
+            self.update_label.text = "업데이트 실패 (인터넷 확인)"
 
 if __name__ == "__main__":
     ExchangeRateApp().run()
