@@ -288,7 +288,6 @@ class SettingsPopup(ModalView):
         header = RelativeLayout(size_hint_y=None, height=130)
         with header.canvas.before: Color(1,1,1,1); Rectangle(pos=(0,0), size=Window.size)
         
-        # 🔥 취소 버튼은 삭제하고, 타이틀과 저장 버튼만 남깁니다.
         title = Label(text="설정", font_size=42, bold=True, color=TEXT_BLACK, font_name=K_FONT, pos_hint={'center_x': 0.5, 'center_y': 0.5})
         
         self.save_btn = TextButton(text="저장", font_size=36, color=self.main_app.c_main, bold=True, size_hint=(None, None), size=(120, 100), pos_hint={'right': 0.95, 'center_y': 0.5}, font_name=K_FONT)
@@ -375,7 +374,6 @@ class QuickRatePopup(ModalView):
             vnd_lbl = Label(text=f"{vnd:,} ₫", font_name=K_FONT, font_size=46, bold=True, color=TEXT_BLACK, size_hint_x=0.40, halign='right', valign='middle')
             vnd_lbl.bind(size=vnd_lbl.setter('text_size'))
             
-            # 🔥 이미지를 빼고, 크고 뚜렷한 텍스트 화살표(→)를 넣었습니다!
             arrow_lbl = Label(text="→", font_name=K_FONT, font_size=55, color=(0.6, 0.6, 0.6, 1), size_hint_x=0.20, halign='center', valign='middle')
             arrow_lbl.bind(size=arrow_lbl.setter('text_size'))
             
@@ -393,21 +391,58 @@ class QuickRatePopup(ModalView):
         copy_text = f"[환율 {self.current_rate} 기준 퀵 환산표]\n" + "\n".join(self.calculated_data); Clipboard.copy(copy_text)
         self.copy_btn.text = "완료"; Clock.schedule_once(lambda dt: setattr(self.copy_btn, 'text', "복사"), 1.5)
 
+# 🔥 [저장] 버튼 눌렀을 때의 팝업 UI만 수정
 class ThemeSavePopup(ModalView):
-    def __init__(self, on_confirm, **kwargs):
+    def __init__(self, on_confirm, on_select_all, **kwargs):
         super().__init__(**kwargs)
-        self.size_hint = (0.75, None); self.height = 320; self.background = ""; self.background_color = (0,0,0, 0.4) 
+        # 높이를 줄이고 더 깔끔하게 콤팩트한 사이즈로 변경
+        self.size_hint = (0.85, None); self.height = 300; self.background = ""; self.background_color = (0,0,0, 0.4) 
+        
         main_layout = RelativeLayout()
-        with main_layout.canvas.before: Color(1, 1, 1, 1); self.bg_rect = RoundedRectangle(pos=(0,0), size=self.size, radius=[35]); Color(0.85, 0.85, 0.85, 1); self.h_line = Line(points=[0, 110, self.width, 110], width=1); self.v_line = Line(points=[self.width/2, 0, self.width/2, 110], width=1)
+        with main_layout.canvas.before: 
+            Color(1, 1, 1, 1); self.bg_rect = RoundedRectangle(pos=(0,0), size=self.size, radius=[35])
+            # 하단 버튼 구분선 (가로선 + 3분할 세로선 2개)
+            Color(0.85, 0.85, 0.85, 1); self.h_line = Line(points=[0, 110, self.width, 110], width=1)
+            self.v_line1 = Line(points=[self.width/3, 0, self.width/3, 110], width=1)
+            self.v_line2 = Line(points=[2*self.width/3, 0, 2*self.width/3, 110], width=1)
         main_layout.bind(size=self.update_graphics)
-        box = BoxLayout(orientation='vertical'); lbl_box = RelativeLayout(size_hint_y=0.6); lbl = Label(text="메모를 저장할까요?", font_name=K_FONT, font_size=36, bold=True, color=TEXT_BLACK, pos_hint={'center_x': 0.5, 'center_y': 0.5}); lbl_box.add_widget(lbl); box.add_widget(lbl_box)
+        
+        box = BoxLayout(orientation='vertical')
+        
+        # 1. 상단 타이틀 영역
+        lbl_box = RelativeLayout(size_hint_y=None, height=190)
+        lbl = Label(text="메모 관리", font_name=K_FONT, font_size=38, bold=True, color=TEXT_BLACK, pos_hint={'center_x': 0.5, 'center_y': 0.5})
+        lbl_box.add_widget(lbl)
+        box.add_widget(lbl_box)
+        
+        # 2. 하단 3분할 버튼 영역
         btn_box = BoxLayout(size_hint_y=None, height=110)
-        c_btn = TextButton(text="취소", font_size=34, color=(0.4, 0.4, 0.4, 1), font_name=K_FONT)
+        
+        # [취소] - 회색
+        c_btn = TextButton(text="취소", font_size=32, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT)
         c_btn.bind(on_release=lambda x: self.dismiss())
-        s_btn = TextButton(text="저장", font_size=34, bold=True, color=App.get_running_app().c_main, font_name=K_FONT)
+        
+        # [전체선택] - 진한 회색 (원하셨던 UI 핵심)
+        sel_btn = TextButton(text="전체선택", font_size=32, color=(0.3, 0.3, 0.3, 1), font_name=K_FONT)
+        sel_btn.bind(on_release=lambda x: [on_select_all(), self.dismiss()])
+        
+        # [저장] - 검정색(강조)
+        s_btn = TextButton(text="저장", font_size=32, bold=True, color=(0, 0, 0, 1), font_name=K_FONT)
         s_btn.bind(on_release=lambda x: [on_confirm(), self.dismiss()])
-        btn_box.add_widget(c_btn); btn_box.add_widget(s_btn); box.add_widget(btn_box); main_layout.add_widget(box); self.add_widget(main_layout)
-    def update_graphics(self, instance, value): self.bg_rect.size = instance.size; self.h_line.points = [0, 110, instance.width, 110]; self.v_line.points = [instance.width/2, 0, instance.width/2, 110]
+        
+        btn_box.add_widget(c_btn)
+        btn_box.add_widget(sel_btn)
+        btn_box.add_widget(s_btn)
+        
+        box.add_widget(btn_box)
+        main_layout.add_widget(box)
+        self.add_widget(main_layout)
+
+    def update_graphics(self, instance, value): 
+        self.bg_rect.size = instance.size
+        self.h_line.points = [0, 110, instance.width, 110]
+        self.v_line1.points = [instance.width/3, 0, instance.width/3, 110]
+        self.v_line2.points = [2*instance.width/3, 0, 2*instance.width/3, 110]
 
 class HerbPopup(ModalView):
     def __init__(self, **kwargs):
@@ -559,7 +594,11 @@ class ExchangeRateApp(App):
         
         self.quick_btn = StyledButton(text="퀵 환산", bg_color=self.c_sub if t_id!=2 else self.c_muted, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1)); self.quick_btn.bind(on_release=lambda x: QuickRatePopup(current_rate=float(self.rate_in.text if self.rate_in.text else 1)).open()); memo_header.add_widget(self.quick_btn); 
         self.memo_title = Label(text="MEMO", font_size=38, bold=True, color=self.c_text, font_name=K_FONT, halign='center', size_hint_x=0.5); memo_header.add_widget(self.memo_title); 
-        self.save_btn = StyledButton(text="저장", bg_color=self.c_main if t_id!=2 else self.c_sub, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1)); self.save_btn.bind(on_release=lambda x: ThemeSavePopup(on_confirm=self.save_memo_direct).open()); memo_header.add_widget(self.save_btn); memo_container.add_widget(memo_header)
+        
+        # 🔥 저장 버튼 클릭 시 3분할 팝업창 호출
+        self.save_btn = StyledButton(text="저장", bg_color=self.c_main if t_id!=2 else self.c_sub, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1)); 
+        self.save_btn.bind(on_release=lambda x: ThemeSavePopup(on_confirm=self.save_memo_direct, on_select_all=self.memo_input.select_all).open()); 
+        memo_header.add_widget(self.save_btn); memo_container.add_widget(memo_header)
         
         self.memo_scroll = ScrollView(
             do_scroll_x=False, 
