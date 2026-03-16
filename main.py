@@ -22,7 +22,6 @@ from kivy.core.clipboard import Clipboard
 from kivy.properties import BooleanProperty
 from kivy.animation import Animation
 
-# ✅ Android adjustResize 적용
 try:
     from android.runnable import run_on_ui_thread
     from jnius import autoclass
@@ -35,7 +34,7 @@ if ANDROID:
     @run_on_ui_thread
     def set_resize_mode():
         activity = PythonActivity.mActivity
-        activity.getWindow().setSoftInputMode(0x10)  # SOFT_INPUT_ADJUST_RESIZE
+        activity.getWindow().setSoftInputMode(0x10)
     set_resize_mode()
 
 DATA_FILE = "app_data.json"
@@ -368,11 +367,13 @@ class QuickRatePopup(ModalView):
         grid.add_widget(Widget(size_hint_y=None, height=47))
         scroll.add_widget(grid); main_layout.add_widget(scroll)
         self.add_widget(main_layout)
-        
+
     def copy_to_clipboard(self, inst):
-        copy_text = f"[환율 {self.current_rate} 기준 퀵 환산표]\n" + "\n".join(self.calculated_data)
+        lines = [f"[환율 {self.current_rate} 기준 퀵 환산표]"] + self.calculated_data
+        copy_text = "\n".join(lines).strip()
         Clipboard.copy(copy_text)
-        self.copy_btn.text = "완료"; Clock.schedule_once(lambda dt: setattr(self.copy_btn, 'text', "복사"), 1.5)
+        self.copy_btn.text = "완료"
+        Clock.schedule_once(lambda dt: setattr(self.copy_btn, 'text', "복사"), 1.5)
 
 class ThemeSavePopup(ModalView):
     def __init__(self, on_confirm, on_select_all, **kwargs):
@@ -394,7 +395,17 @@ class ThemeSavePopup(ModalView):
         c_btn = TextButton(text="취소", font_size=32, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT)
         c_btn.bind(on_release=lambda x: self.dismiss())
         sel_btn = TextButton(text="전체선택", font_size=32, color=(0.3, 0.3, 0.3, 1), font_name=K_FONT)
-        sel_btn.bind(on_release=lambda x: [on_select_all(), self.dismiss()])
+
+        # ✅ 핵심 수정: 팝업 닫은 후 포커스+전체선택 순서대로 실행
+        def do_select_all(x):
+            self.dismiss()
+            def _focus_and_select(dt):
+                memo = App.get_running_app().memo_input
+                memo.focus = True
+                Clock.schedule_once(lambda dt2: on_select_all(), 0.1)
+            Clock.schedule_once(_focus_and_select, 0.2)
+        sel_btn.bind(on_release=do_select_all)
+
         s_btn = TextButton(text="저장", font_size=32, bold=True, color=(0, 0, 0, 1), font_name=K_FONT)
         s_btn.bind(on_release=lambda x: [on_confirm(), self.dismiss()])
         btn_box.add_widget(c_btn); btn_box.add_widget(sel_btn); btn_box.add_widget(s_btn)
@@ -604,15 +615,11 @@ class ExchangeRateApp(App):
             self.memo_input.height = max(self.memo_scroll.height, self.memo_input.minimum_height)
         self.memo_scroll.bind(height=update_memo_height)
         self.memo_input.bind(minimum_height=update_memo_height)
-        
-        # ✅ 메모 포커스 이벤트 연결
         self.memo_input.bind(focus=self.on_memo_focus)
-        
         self.memo_scroll.add_widget(self.memo_input)
         memo_container.add_widget(self.memo_scroll)
         root.add_widget(memo_container)
         
-        # ✅ self.bottom_box 으로 변경 (숨김/표시 제어용)
         self.bottom_box = BoxLayout(orientation='horizontal', size_hint_y=None, height=180, spacing=20)
         self.herb_btn = StyledButton(text="고수 X", bg_color=self.c_sub if t_id!=2 else self.c_muted, size_hint_x=0.25, f_size=55, bold=True, radius=40, t_color=(1,1,1,1))
         self.herb_btn.bind(on_release=lambda x: HerbPopup().open())
@@ -625,7 +632,6 @@ class ExchangeRateApp(App):
         Clock.schedule_once(lambda dt: self.update_ui_for_settings(), 0)
         return root
 
-    # ✅ 키보드 올라오면 하단 버튼 숨김, 내려가면 복원
     def on_memo_focus(self, instance, value):
         if value:
             self.bottom_box.height = 0
