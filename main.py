@@ -22,6 +22,22 @@ from kivy.core.clipboard import Clipboard
 from kivy.properties import BooleanProperty
 from kivy.animation import Animation
 
+# ✅ Android adjustResize 적용
+try:
+    from android.runnable import run_on_ui_thread
+    from jnius import autoclass
+    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+    ANDROID = True
+except:
+    ANDROID = False
+
+if ANDROID:
+    @run_on_ui_thread
+    def set_resize_mode():
+        activity = PythonActivity.mActivity
+        activity.getWindow().setSoftInputMode(0x10)  # SOFT_INPUT_ADJUST_RESIZE
+    set_resize_mode()
+
 DATA_FILE = "app_data.json"
 ICON_SET = "set.png"      
 IMAGE_HERB = "herb.png"    
@@ -81,12 +97,10 @@ class StyledButton(ButtonBehavior, Label):
         self.font_size, self.color, self.font_name, self.radius = f_size, t_color, K_FONT, [radius,]
         self.light_color = [min(1, c + 0.15) for c in bg_color[:3]] + [1]
         self.dark_color = [max(0, c - 0.15) for c in bg_color[:3]] + [1]
-        
         with self.canvas.before:
             self.shadow_dark = Color(*self.dark_color); self.rect_dark = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
             self.shadow_light = Color(*self.light_color); self.rect_light = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
             self.btn_color_obj = Color(*self.original_color); self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
-            
         self.bind(pos=self.update_rect, size=self.update_rect)
         
     def update_color(self, new_bg_color):
@@ -99,26 +113,20 @@ class StyledButton(ButtonBehavior, Label):
 
     def on_press(self):
         self.rect.pos = (self.pos[0] + 3, self.pos[1] - 3); self.shadow_light.a = 0; self.shadow_dark.a = 0
-        
     def on_release(self):
         self.rect.pos = self.pos; self.shadow_light.a = 1; self.shadow_dark.a = 1
-        
     def update_rect(self, *args):
         self.rect_dark.pos = (self.pos[0] + 4, self.pos[1] - 4); self.rect_dark.size = self.size
         self.rect_light.pos = (self.pos[0] - 4, self.pos[1] + 4); self.rect_light.size = self.size
         self.rect.pos = self.pos; self.rect.size = self.size
 
 class ImageButton(ButtonBehavior, Image):
-    def on_press(self):
-        self.color = (0.7, 0.7, 0.7, 1)
-    def on_release(self):
-        self.color = (1, 1, 1, 1)
+    def on_press(self): self.color = (0.7, 0.7, 0.7, 1)
+    def on_release(self): self.color = (1, 1, 1, 1)
 
 class TextButton(ButtonBehavior, Label):
-    def on_press(self):
-        self.opacity = 0.5
-    def on_release(self):
-        self.opacity = 1.0
+    def on_press(self): self.opacity = 0.5
+    def on_release(self): self.opacity = 1.0
 
 class ThemePillSwitch(ButtonBehavior, Widget):
     def __init__(self, main_app, **kwargs):
@@ -153,8 +161,6 @@ class ThemePillSwitch(ButtonBehavior, Widget):
         target_x = self.x + 5 + (self.theme_id - 1) * gap
         Animation(pos=(target_x, self.y + 5), t='out_quad', duration=0.2).start(self.thumb_circle)
         Animation(rgba=self.get_theme_color(self.theme_id), t='out_quad', duration=0.2).start(self.thumb_color)
-        
-        # 미리보기만 적용
         self.main_app.apply_theme_ui(self.theme_id)
 
 class PillSwitch(ButtonBehavior, Widget):
@@ -196,27 +202,21 @@ class CommaTextInput(TextInput):
         app = App.get_running_app()
         if app.is_updating: return
         raw = self.text.replace(",", "").replace("K", "")
-        
         target_font = 58
         if app.settings.get("auto_font", False):
             if len(raw) > 11: target_font = 40
             elif len(raw) > 8: target_font = 48
-            
         self.font_size = target_font 
-            
         if not raw: 
             app.is_updating = True; self.text = ""; app.is_updating = False
             app.execute_calc("", self); return
-            
         try:
             formatted = "{:,}".format(int(float(raw)))
             if self.k_mode: formatted += "K" 
-            
             if self.text != formatted:
                 app.is_updating = True; self.text = formatted; app.is_updating = False
                 if self.k_mode: self.cursor = (max(0, len(self.text) - 1), 0)
                 else: self.cursor = (len(self.text), 0)
-                
             app.execute_calc(raw, self)
         except: pass
 
@@ -252,7 +252,8 @@ class CardInput(BoxLayout):
         if self.input.text: self.input.format_and_calc()
         
     def update_rect(self, *args):
-        self.rect.pos, self.rect.size = self.pos, self.size; self.line.rounded_rectangle = (self.x, self.y, self.width, self.height, 25)
+        self.rect.pos, self.rect.size = self.pos, self.size
+        self.line.rounded_rectangle = (self.x, self.y, self.width, self.height, 25)
 
 class RateTextInput(TextInput):
     def insert_text(self, substring, from_undo=False):
@@ -279,33 +280,25 @@ class SettingsPopup(ModalView):
         self.main_app = main_app
         self.size_hint = (1, 1) 
         self.background = ""; self.background_color = (1, 1, 1, 1) 
-        
         self.original_theme = self.main_app.settings.get("theme", 1)
         self.is_saved = False
         self.bind(on_dismiss=self.on_cancel)
-        
         main_layout = BoxLayout(orientation='vertical')
         header = RelativeLayout(size_hint_y=None, height=130)
         with header.canvas.before: Color(1,1,1,1); Rectangle(pos=(0,0), size=Window.size)
-        
         title = Label(text="설정", font_size=42, bold=True, color=TEXT_BLACK, font_name=K_FONT, pos_hint={'center_x': 0.5, 'center_y': 0.5})
-        
         self.save_btn = TextButton(text="저장", font_size=36, color=self.main_app.c_main, bold=True, size_hint=(None, None), size=(120, 100), pos_hint={'right': 0.95, 'center_y': 0.5}, font_name=K_FONT)
         self.save_btn.bind(on_release=self.save_and_close)
-        
         header.add_widget(title); header.add_widget(self.save_btn); main_layout.add_widget(header)
         with main_layout.canvas.after: Color(0.9, 0.9, 0.9, 1); Line(points=[0, Window.height-130, Window.width, Window.height-130], width=1)
-        
         scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
         list_grid = GridLayout(cols=1, size_hint_y=None, spacing=10)
         list_grid.bind(minimum_height=list_grid.setter('height'))
-        
         theme_row = UnderlineLayout(size_hint_y=None, height=140)
         theme_lbl = Label(text="앱 테마 변경\n(블루/기본/다크)", font_name=K_FONT, font_size=32, color=TEXT_BLACK, size_hint=(0.6, 1), pos_hint={'x': 0.02, 'center_y': 0.5}, halign='left', valign='middle')
         theme_lbl.bind(size=theme_lbl.setter('text_size'))
         self.theme_sw = ThemePillSwitch(main_app=self.main_app, pos_hint={'right': 0.98, 'center_y': 0.5})
         theme_row.add_widget(theme_lbl); theme_row.add_widget(self.theme_sw); list_grid.add_widget(theme_row)
-        
         s_list = [("auto_update", "시작 시 환율 자동 업데이트"), ("auto_zeros", "VND 입력 시 000 생략 (K)"), ("round_krw", "KRW 100원 단위 반올림"), ("auto_font", "금액 길이에 맞춰 폰트 자동 조절")]
         for k, t in s_list:
             row = UnderlineLayout(size_hint_y=None, height=120)
@@ -314,7 +307,6 @@ class SettingsPopup(ModalView):
             sw = PillSwitch(active_color=self.main_app.c_main, active=bool(self.main_app.settings.get(k, False)), pos_hint={'right': 0.98, 'center_y': 0.5})
             setattr(self, f"sw_{k}", sw)
             row.add_widget(lbl); row.add_widget(sw); list_grid.add_widget(row)
-            
         list_grid.add_widget(Widget(size_hint_y=None, height=Window.height*0.3))
         scroll.add_widget(list_grid); main_layout.add_widget(scroll)
         self.add_widget(main_layout)
@@ -333,7 +325,6 @@ class SettingsPopup(ModalView):
         if not self.is_saved:
             if self.theme_sw.theme_id != self.original_theme:
                 self.main_app.apply_theme_ui(self.original_theme)
-
 
 class QuickRatePopup(ModalView):
     def __init__(self, current_rate, **kwargs):
@@ -354,11 +345,9 @@ class QuickRatePopup(ModalView):
         with main_layout.canvas.after: Color(0.9, 0.9, 0.9, 1); Line(points=[0, Window.height-130, Window.width, Window.height-130], width=1)
         info = Label(text=f"현재 환율: {current_rate} 기준", font_size=32, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT, size_hint_y=None, height=80)
         main_layout.add_widget(info)
-        
         scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
         grid = GridLayout(cols=1, size_hint_y=None, spacing=0) 
         grid.bind(minimum_height=grid.setter('height'))
-        
         vnd_list = [1000, 5000, 10000, 20000, 30000, 50000, 100000, 200000, 300000, 500000, 1000000]
         self.calculated_data = []
         for vnd in vnd_list:
@@ -366,74 +355,49 @@ class QuickRatePopup(ModalView):
             if vnd < 10000: krw = int((krw + 5) // 10) * 10
             else: krw = int((krw + 50) // 100) * 100
             self.calculated_data.append(f"{vnd:,}동 = {int(krw):,}원")
-            
             row = UnderlineLayout(size_hint_y=None, height=130)
-            
             box = BoxLayout(orientation='horizontal', size_hint=(1, 1), spacing=5, padding=[10, 0])
-            
             vnd_lbl = Label(text=f"{vnd:,} ₫", font_name=K_FONT, font_size=46, bold=True, color=TEXT_BLACK, size_hint_x=0.40, halign='right', valign='middle')
             vnd_lbl.bind(size=vnd_lbl.setter('text_size'))
-            
             arrow_lbl = Label(text="→", font_name=K_FONT, font_size=55, color=(0.6, 0.6, 0.6, 1), size_hint_x=0.20, halign='center', valign='middle')
             arrow_lbl.bind(size=arrow_lbl.setter('text_size'))
-            
             krw_lbl = Label(text=f"{int(krw):,} 원", font_name=K_FONT, font_size=44, color=app.c_text, size_hint_x=0.40, halign='left', valign='middle')
             krw_lbl.bind(size=krw_lbl.setter('text_size'))
-            
             box.add_widget(vnd_lbl); box.add_widget(arrow_lbl); box.add_widget(krw_lbl)
             row.add_widget(box); grid.add_widget(row)
-            
         grid.add_widget(Widget(size_hint_y=None, height=47))
         scroll.add_widget(grid); main_layout.add_widget(scroll)
         self.add_widget(main_layout)
         
     def copy_to_clipboard(self, inst):
-        copy_text = f"[환율 {self.current_rate} 기준 퀵 환산표]\n" + "\n".join(self.calculated_data); Clipboard.copy(copy_text)
+        copy_text = f"[환율 {self.current_rate} 기준 퀵 환산표]\n" + "\n".join(self.calculated_data)
+        Clipboard.copy(copy_text)
         self.copy_btn.text = "완료"; Clock.schedule_once(lambda dt: setattr(self.copy_btn, 'text', "복사"), 1.5)
 
-# 🔥 [저장] 버튼 눌렀을 때의 팝업 UI만 수정
 class ThemeSavePopup(ModalView):
     def __init__(self, on_confirm, on_select_all, **kwargs):
         super().__init__(**kwargs)
-        # 높이를 줄이고 더 깔끔하게 콤팩트한 사이즈로 변경
         self.size_hint = (0.85, None); self.height = 300; self.background = ""; self.background_color = (0,0,0, 0.4) 
-        
         main_layout = RelativeLayout()
         with main_layout.canvas.before: 
             Color(1, 1, 1, 1); self.bg_rect = RoundedRectangle(pos=(0,0), size=self.size, radius=[35])
-            # 하단 버튼 구분선 (가로선 + 3분할 세로선 2개)
             Color(0.85, 0.85, 0.85, 1); self.h_line = Line(points=[0, 110, self.width, 110], width=1)
             self.v_line1 = Line(points=[self.width/3, 0, self.width/3, 110], width=1)
             self.v_line2 = Line(points=[2*self.width/3, 0, 2*self.width/3, 110], width=1)
         main_layout.bind(size=self.update_graphics)
-        
         box = BoxLayout(orientation='vertical')
-        
-        # 1. 상단 타이틀 영역
         lbl_box = RelativeLayout(size_hint_y=None, height=190)
         lbl = Label(text="메모 관리", font_name=K_FONT, font_size=38, bold=True, color=TEXT_BLACK, pos_hint={'center_x': 0.5, 'center_y': 0.5})
         lbl_box.add_widget(lbl)
         box.add_widget(lbl_box)
-        
-        # 2. 하단 3분할 버튼 영역
         btn_box = BoxLayout(size_hint_y=None, height=110)
-        
-        # [취소] - 회색
         c_btn = TextButton(text="취소", font_size=32, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT)
         c_btn.bind(on_release=lambda x: self.dismiss())
-        
-        # [전체선택] - 진한 회색 (원하셨던 UI 핵심)
         sel_btn = TextButton(text="전체선택", font_size=32, color=(0.3, 0.3, 0.3, 1), font_name=K_FONT)
         sel_btn.bind(on_release=lambda x: [on_select_all(), self.dismiss()])
-        
-        # [저장] - 검정색(강조)
         s_btn = TextButton(text="저장", font_size=32, bold=True, color=(0, 0, 0, 1), font_name=K_FONT)
         s_btn.bind(on_release=lambda x: [on_confirm(), self.dismiss()])
-        
-        btn_box.add_widget(c_btn)
-        btn_box.add_widget(sel_btn)
-        btn_box.add_widget(s_btn)
-        
+        btn_box.add_widget(c_btn); btn_box.add_widget(sel_btn); btn_box.add_widget(s_btn)
         box.add_widget(btn_box)
         main_layout.add_widget(box)
         self.add_widget(main_layout)
@@ -474,7 +438,6 @@ class CalculatorPopup(Popup):
         self.display = Label(text="", font_size=100, bold=True, color=TEXT_BLACK, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
         display_box.add_widget(self.formula); display_box.add_widget(self.display); main_layout.add_widget(display_box)
         grid = GridLayout(cols=4, spacing=25, size_hint_y=0.62)
-        
         c_sub = self.main_app.c_sub
         btns = [['7', NUM_LIGHT_GRAY], ['8', NUM_LIGHT_GRAY], ['9', NUM_LIGHT_GRAY], ['/', c_sub], ['4', NUM_LIGHT_GRAY], ['5', NUM_LIGHT_GRAY], ['6', NUM_LIGHT_GRAY], ['*', c_sub], ['1', NUM_LIGHT_GRAY], ['2', NUM_LIGHT_GRAY], ['3', NUM_LIGHT_GRAY], ['-', c_sub], ['C', (1, 0.88, 0.88, 1)], ['0', NUM_LIGHT_GRAY], ['BACKSPACE', NUM_LIGHT_GRAY], ['+', c_sub], ['00', NUM_LIGHT_GRAY], ['000', NUM_LIGHT_GRAY], ['0000', NUM_LIGHT_GRAY], ['FLAG', (0.9, 0.94, 1, 1)]]
         for txt, clr in btns:
@@ -485,7 +448,12 @@ class CalculatorPopup(Popup):
                 btn = StyledButton(bg_color=clr, radius=15); img = Image(source=ICON_BACKSPACE, size_hint=(0.6, 0.6), pos_hint={'center_x': 0.5, 'center_y': 0.5}); btn.bind(on_release=lambda x: self.on_key_press('BACK')); f_layout.add_widget(btn); f_layout.add_widget(img); grid.add_widget(f_layout); continue
             t_color = self.main_app.c_text if txt in '/+*-' else TEXT_BLACK
             btn = StyledButton(text=txt, bg_color=clr, radius=15, f_size=80 if len(txt)<2 else 50, t_color=t_color); btn.bind(on_release=lambda x, t=txt: self.on_key_press(t)); grid.add_widget(btn)
-        main_layout.add_widget(grid); self.apply_btn = StyledButton(text="금액 적용하기", bg_color=self.main_app.c_main, size_hint_y=0.14, f_size=55, radius=20, t_color=(1,1,1,1)); self.apply_btn.bind(on_release=self.apply); main_layout.add_widget(self.apply_btn); self.content = main_layout
+        main_layout.add_widget(grid)
+        self.apply_btn = StyledButton(text="금액 적용하기", bg_color=self.main_app.c_main, size_hint_y=0.14, f_size=55, radius=20, t_color=(1,1,1,1))
+        self.apply_btn.bind(on_release=self.apply)
+        main_layout.add_widget(self.apply_btn)
+        self.content = main_layout
+
     def update_bg(self, instance, value): self.bg_rect.pos, self.bg_rect.size = instance.pos, instance.size
     def update_disp_rect(self, instance, value): self.disp_rect.pos, self.disp_rect.size = instance.pos, instance.size; self.disp_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 20)
     def toggle_currency(self, inst): self.main_app.swap(); self.target_row = self.main_app.row1; self.pop_flag_img.source = self.target_row.flag_img.source
@@ -556,32 +524,47 @@ class ExchangeRateApp(App):
         self.apply_theme_ui(theme_id)
 
     def build(self):
-        self.is_swapped, self.is_updating = False, False; self.app_data = load_data(); self.settings = self.app_data["settings"]; self.last_saved_memo = self.app_data["memo"]; initial_rate = self.app_data["rate"]
-        
+        self.is_swapped, self.is_updating = False, False
+        self.app_data = load_data()
+        self.settings = self.app_data["settings"]
+        self.last_saved_memo = self.app_data["memo"]
+        initial_rate = self.app_data["rate"]
         self.set_theme_colors(self.settings.get("theme", 1))
         
         root = BoxLayout(orientation='vertical', padding=[25, 25], spacing=18)
         
         header_box = RelativeLayout(size_hint_y=None, height=100)
         self.title_lbl = Label(text="환율 계산기", font_size=52, bold=True, color=self.c_text, font_name=K_FONT, halign='center', pos_hint={'center_x': 0.5, 'center_y': 0.5})
-        
         settings_layout = RelativeLayout(size_hint=(None, None), size=(100, 100), pos_hint={'right': 1, 'center_y': 0.5})
         settings_btn = StyledButton(bg_color=MAIN_BG)
         settings_img = Image(source=ICON_SET, size_hint=(0.6, 0.6), pos_hint={'center_x': 0.5, 'center_y': 0.5})
         settings_btn.bind(on_release=lambda x: SettingsPopup(self).open())
         settings_layout.add_widget(settings_btn); settings_layout.add_widget(settings_img)
+        header_box.add_widget(self.title_lbl); header_box.add_widget(settings_layout)
+        root.add_widget(header_box)
         
-        header_box.add_widget(self.title_lbl); header_box.add_widget(settings_layout); root.add_widget(header_box)
+        self.row1 = CardInput(label_text="VND", flag_url=FLAG_VN, cursor_c=self.c_main)
+        self.row2 = CardInput(label_text="KRW", flag_url=FLAG_KR, cursor_c=self.c_main)
+        root.add_widget(self.row1); root.add_widget(self.row2)
         
-        self.row1 = CardInput(label_text="VND", flag_url=FLAG_VN, cursor_c=self.c_main); self.row2 = CardInput(label_text="KRW", flag_url=FLAG_KR, cursor_c=self.c_main); root.add_widget(self.row1); root.add_widget(self.row2)
-        ctrl_area = BoxLayout(orientation='vertical', size_hint_y=None, height=145); ctrl_box = BoxLayout(size_hint_y=None, height=100, spacing=15); self.rate_in = RateTextInput(text=initial_rate, multiline=False, font_size=45, size_hint_x=0.35, halign='center', background_normal='', background_color=(0.9, 0.92, 0.95, 1), foreground_color=TEXT_BLACK, font_name=K_FONT, input_type='text')
-        
+        ctrl_area = BoxLayout(orientation='vertical', size_hint_y=None, height=145)
+        ctrl_box = BoxLayout(size_hint_y=None, height=100, spacing=15)
+        self.rate_in = RateTextInput(text=initial_rate, multiline=False, font_size=45, size_hint_x=0.35, halign='center', background_normal='', background_color=(0.9, 0.92, 0.95, 1), foreground_color=TEXT_BLACK, font_name=K_FONT, input_type='text')
         t_id = self.settings.get("theme", 1)
-        self.live_btn = StyledButton(text="실시간", bg_color=self.c_main if t_id!=2 else self.c_sub, size_hint_x=0.25, f_size=32, t_color=(1,1,1,1)); self.live_btn.bind(on_release=lambda x: self.get_rate()); 
-        self.swap_btn = StyledButton(text="⇅ 위치 변경", bg_color=self.c_muted, size_hint_x=0.25, f_size=32, t_color=(1,1,1,1)); self.swap_btn.bind(on_release=lambda x: self.swap()); 
-        
-        ctrl_box.add_widget(Label(text="환율", font_size=38, bold=True, size_hint_x=0.15, font_name=K_FONT, color=TEXT_BLACK)); ctrl_box.add_widget(self.rate_in); ctrl_box.add_widget(self.live_btn); ctrl_box.add_widget(self.swap_btn)
-        date_line = BoxLayout(size_hint_y=None, height=45); date_line.add_widget(Widget(size_hint_x=0.15)); init_label = f"{datetime.datetime.now().strftime('%y.%m.%d %H:%M')} 수동 입력" if initial_rate else "환율을 업데이트 하세요"; self.update_label = Label(text=init_label, font_size=28, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT, size_hint_x=0.4, halign='center', valign='top'); self.update_label.bind(size=lambda l, s: setattr(l, 'text_size', s)); date_line.add_widget(self.update_label); date_line.add_widget(Widget(size_hint_x=0.45)); ctrl_area.add_widget(ctrl_box); ctrl_area.add_widget(date_line); root.add_widget(ctrl_area)
+        self.live_btn = StyledButton(text="실시간", bg_color=self.c_main if t_id!=2 else self.c_sub, size_hint_x=0.25, f_size=32, t_color=(1,1,1,1))
+        self.live_btn.bind(on_release=lambda x: self.get_rate())
+        self.swap_btn = StyledButton(text="⇅ 위치 변경", bg_color=self.c_muted, size_hint_x=0.25, f_size=32, t_color=(1,1,1,1))
+        self.swap_btn.bind(on_release=lambda x: self.swap())
+        ctrl_box.add_widget(Label(text="환율", font_size=38, bold=True, size_hint_x=0.15, font_name=K_FONT, color=TEXT_BLACK))
+        ctrl_box.add_widget(self.rate_in); ctrl_box.add_widget(self.live_btn); ctrl_box.add_widget(self.swap_btn)
+        date_line = BoxLayout(size_hint_y=None, height=45)
+        date_line.add_widget(Widget(size_hint_x=0.15))
+        init_label = f"{datetime.datetime.now().strftime('%y.%m.%d %H:%M')} 수동 입력" if initial_rate else "환율을 업데이트 하세요"
+        self.update_label = Label(text=init_label, font_size=28, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT, size_hint_x=0.4, halign='center', valign='top')
+        self.update_label.bind(size=lambda l, s: setattr(l, 'text_size', s))
+        date_line.add_widget(self.update_label); date_line.add_widget(Widget(size_hint_x=0.45))
+        ctrl_area.add_widget(ctrl_box); ctrl_area.add_widget(date_line)
+        root.add_widget(ctrl_area)
         
         memo_container = BoxLayout(orientation='vertical', size_hint_y=1, padding=[5, 5])
         with memo_container.canvas.before: 
@@ -589,66 +572,82 @@ class ExchangeRateApp(App):
             self.memo_rect = RoundedRectangle(pos=(0,0), size=(0,0), radius=[25,])
             self.memo_line_color = Color(*[max(0, c - 0.1) for c in self.c_memo[:3]] + [0.5])
             self.memo_line = Line(rounded_rectangle=(0,0,0,0, 25), width=1.2)
-            
-        memo_container.bind(pos=self.update_memo_design, size=self.update_memo_design); memo_header = BoxLayout(orientation='horizontal', size_hint_y=None, height=85, padding=[15, 10], spacing=10); 
+        memo_container.bind(pos=self.update_memo_design, size=self.update_memo_design)
         
-        self.quick_btn = StyledButton(text="퀵 환산", bg_color=self.c_sub if t_id!=2 else self.c_muted, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1)); self.quick_btn.bind(on_release=lambda x: QuickRatePopup(current_rate=float(self.rate_in.text if self.rate_in.text else 1)).open()); memo_header.add_widget(self.quick_btn); 
-        self.memo_title = Label(text="MEMO", font_size=38, bold=True, color=self.c_text, font_name=K_FONT, halign='center', size_hint_x=0.5); memo_header.add_widget(self.memo_title); 
-        
-        # 🔥 저장 버튼 클릭 시 3분할 팝업창 호출
-        self.save_btn = StyledButton(text="저장", bg_color=self.c_main if t_id!=2 else self.c_sub, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1)); 
-        self.save_btn.bind(on_release=lambda x: ThemeSavePopup(on_confirm=self.save_memo_direct, on_select_all=self.memo_input.select_all).open()); 
-        memo_header.add_widget(self.save_btn); memo_container.add_widget(memo_header)
+        memo_header = BoxLayout(orientation='horizontal', size_hint_y=None, height=85, padding=[15, 10], spacing=10)
+        self.quick_btn = StyledButton(text="퀵 환산", bg_color=self.c_sub if t_id!=2 else self.c_muted, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1))
+        self.quick_btn.bind(on_release=lambda x: QuickRatePopup(current_rate=float(self.rate_in.text if self.rate_in.text else 1)).open())
+        memo_header.add_widget(self.quick_btn)
+        self.memo_title = Label(text="MEMO", font_size=38, bold=True, color=self.c_text, font_name=K_FONT, halign='center', size_hint_x=0.5)
+        memo_header.add_widget(self.memo_title)
+        self.save_btn = StyledButton(text="저장", bg_color=self.c_main if t_id!=2 else self.c_sub, size_hint_x=0.25, f_size=32, radius=15, t_color=(1,1,1,1))
+        self.save_btn.bind(on_release=lambda x: ThemeSavePopup(on_confirm=self.save_memo_direct, on_select_all=self.memo_input.select_all).open())
+        memo_header.add_widget(self.save_btn)
+        memo_container.add_widget(memo_header)
         
         self.memo_scroll = ScrollView(
-            do_scroll_x=False, 
-            do_scroll_y=True,
-            bar_width=15,                     
-            bar_margin=12,                    
-            scroll_type=['bars', 'content'],  
+            do_scroll_x=False, do_scroll_y=True,
+            bar_width=15, bar_margin=12,
+            scroll_type=['bars', 'content'],
             bar_color=(0.5, 0.5, 0.5, 0.6),
             bar_inactive_color=(0.6, 0.6, 0.6, 0.3),
             size_hint=(1, 1)
         )
-        
         self.memo_input = TextInput(
-            text=self.last_saved_memo, 
-            font_size=40, 
-            background_color=(0,0,0,0), 
-            foreground_color=TEXT_BLACK, 
-            padding=[30, 15, 40, 15], 
-            font_name=K_FONT, 
-            multiline=True, 
-            line_height=1.2, 
-            cursor_color=self.c_main,
-            size_hint_y=None 
+            text=self.last_saved_memo, font_size=40,
+            background_color=(0,0,0,0), foreground_color=TEXT_BLACK,
+            padding=[30, 15, 40, 15], font_name=K_FONT,
+            multiline=True, line_height=1.2,
+            cursor_color=self.c_main, size_hint_y=None
         )
-        
         def update_memo_height(*args):
             self.memo_input.height = max(self.memo_scroll.height, self.memo_input.minimum_height)
-            
         self.memo_scroll.bind(height=update_memo_height)
         self.memo_input.bind(minimum_height=update_memo_height)
+        
+        # ✅ 메모 포커스 이벤트 연결
+        self.memo_input.bind(focus=self.on_memo_focus)
         
         self.memo_scroll.add_widget(self.memo_input)
         memo_container.add_widget(self.memo_scroll)
         root.add_widget(memo_container)
         
-        bottom_box = BoxLayout(orientation='horizontal', size_hint_y=None, height=180, spacing=20)
-        
+        # ✅ self.bottom_box 으로 변경 (숨김/표시 제어용)
+        self.bottom_box = BoxLayout(orientation='horizontal', size_hint_y=None, height=180, spacing=20)
         self.herb_btn = StyledButton(text="고수 X", bg_color=self.c_sub if t_id!=2 else self.c_muted, size_hint_x=0.25, f_size=55, bold=True, radius=40, t_color=(1,1,1,1))
         self.herb_btn.bind(on_release=lambda x: HerbPopup().open())
         self.main_calc_btn = StyledButton(text="계산기 열기", bg_color=self.c_main, size_hint_x=0.75, f_size=55, bold=True, radius=40, t_color=(1,1,1,1))
         self.main_calc_btn.bind(on_release=lambda x: CalculatorPopup(self, self.row1).open())
+        self.bottom_box.add_widget(self.herb_btn)
+        self.bottom_box.add_widget(self.main_calc_btn)
+        root.add_widget(self.bottom_box)
         
-        bottom_box.add_widget(self.herb_btn); bottom_box.add_widget(self.main_calc_btn); root.add_widget(bottom_box)
-        Clock.schedule_once(lambda dt: self.update_ui_for_settings(), 0); return root
-        
-    def save_all_data(self): self.app_data["rate"] = self.rate_in.text; self.app_data["memo"] = self.memo_input.text; self.app_data["settings"] = self.settings; save_data(self.app_data)
+        Clock.schedule_once(lambda dt: self.update_ui_for_settings(), 0)
+        return root
+
+    # ✅ 키보드 올라오면 하단 버튼 숨김, 내려가면 복원
+    def on_memo_focus(self, instance, value):
+        if value:
+            self.bottom_box.height = 0
+            self.bottom_box.opacity = 0
+        else:
+            self.bottom_box.height = 180
+            self.bottom_box.opacity = 1
+
+    def save_all_data(self):
+        self.app_data["rate"] = self.rate_in.text
+        self.app_data["memo"] = self.memo_input.text
+        self.app_data["settings"] = self.settings
+        save_data(self.app_data)
     
-    def save_memo_direct(self): self.last_saved_memo = self.memo_input.text; self.save_all_data()
+    def save_memo_direct(self):
+        self.last_saved_memo = self.memo_input.text
+        self.save_all_data()
     
-    def update_ui_for_settings(self): is_auto_zeros = self.settings.get("auto_zeros", False); self.row1.set_auto_zero_mode(is_auto_zeros); self.row2.set_auto_zero_mode(is_auto_zeros)
+    def update_ui_for_settings(self):
+        is_auto_zeros = self.settings.get("auto_zeros", False)
+        self.row1.set_auto_zero_mode(is_auto_zeros)
+        self.row2.set_auto_zero_mode(is_auto_zeros)
     
     def clear_all_inputs(self, inst): 
         try: self.is_updating = True; self.row1.input.text = ""; self.row2.input.text = ""
@@ -656,14 +655,17 @@ class ExchangeRateApp(App):
         
     def execute_calc(self, value, source_input):
         if self.is_updating: return
-        is_row1 = (source_input == self.row1.input); target_input = self.row2.input if is_row1 else self.row1.input
+        is_row1 = (source_input == self.row1.input)
+        target_input = self.row2.input if is_row1 else self.row1.input
         if not value or value == ".": self.is_updating = True; target_input.text = ""; self.is_updating = False; return
         try:
             r_text = self.rate_in.text
             if not r_text or r_text == ".": return
-            r = float(r_text); v = float(value.replace(',', '').replace('K', '')); is_auto_zeros = self.settings.get("auto_zeros", False)
+            r = float(r_text); v = float(value.replace(',', '').replace('K', ''))
+            is_auto_zeros = self.settings.get("auto_zeros", False)
             source_is_vnd = FLAG_VN in (self.row1.flag_img.source if is_row1 else self.row2.flag_img.source)
-            actual_v = v * 1000 if (is_auto_zeros and source_is_vnd) else v; target_actual = actual_v / r if source_is_vnd else actual_v * r
+            actual_v = v * 1000 if (is_auto_zeros and source_is_vnd) else v
+            target_actual = actual_v / r if source_is_vnd else actual_v * r
             target_is_vnd = not source_is_vnd
             if self.settings.get("round_krw", False) and not target_is_vnd:
                 target_actual = int((target_actual + 50) // 100) * 100 
@@ -679,10 +681,13 @@ class ExchangeRateApp(App):
         self.memo_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 25)
         
     def swap(self):
-        self.is_updating = True; v1, v2 = self.row1.input.text, self.row2.input.text; self.is_swapped = not self.is_swapped
+        self.is_updating = True; v1, v2 = self.row1.input.text, self.row2.input.text
+        self.is_swapped = not self.is_swapped
         if self.is_swapped: self.row1.name_label.text, self.row1.flag_img.source = "KRW", FLAG_KR; self.row2.name_label.text, self.row2.flag_img.source = "VND", FLAG_VN
         else: self.row1.name_label.text, self.row1.flag_img.source = "VND", FLAG_VN; self.row2.name_label.text, self.row2.flag_img.source = "KRW", FLAG_KR
-        self.row1.input.text, self.row2.input.text = v2, v1; self.is_updating = False; self.update_ui_for_settings() 
+        self.row1.input.text, self.row2.input.text = v2, v1
+        self.is_updating = False
+        self.update_ui_for_settings()
         
     def on_start(self): 
         if self.settings.get("auto_update", True): 
@@ -692,7 +697,10 @@ class ExchangeRateApp(App):
         try:
             data = requests.get("https://open.er-api.com/v6/latest/KRW", timeout=3).json() 
             if data['result'] == 'success':
-                self.rate_in.text = f"{data['rates']['VND']:.2f}"; now = datetime.datetime.now().strftime("%y.%m.%d %H:%M"); self.update_label.text = f"{now} 기준"; self.save_memo_direct()
+                self.rate_in.text = f"{data['rates']['VND']:.2f}"
+                now = datetime.datetime.now().strftime("%y.%m.%d %H:%M")
+                self.update_label.text = f"{now} 기준"
+                self.save_memo_direct()
                 if self.row1.input.text: self.execute_calc(self.row1.input.text, self.row1.input)
             else:
                 self.update_label.text = "업데이트 실패 (서버 오류)"
