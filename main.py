@@ -78,7 +78,7 @@ K_FONT = get_safe_font()
 MAIN_BG, CARD_BG = (0.93, 0.94, 0.96, 1), (1, 1, 1, 1)
 TEXT_BLACK = (0.15, 0.15, 0.18, 1)
 NUM_LIGHT_GRAY = (0.92, 0.93, 0.95, 1)
-MUTED_COLOR = (0.5, 0.5, 0.5, 1)  # ✅ 날짜/1원= 공통 색상
+MUTED_COLOR = (0.5, 0.5, 0.5, 1)
 
 Window.clearcolor = MAIN_BG
 
@@ -268,7 +268,7 @@ class RateTextInput(TextInput):
         app = App.get_running_app()
         app.update_label.text = f"{datetime.datetime.now().strftime('%y.%m.%d %H:%M')} 수동 입력"
         app.update_rate_desc()
-        app.save_memo_direct()
+        app.save_rate_and_settings()
         Clock.schedule_once(lambda dt: app.execute_calc(app.row1.input.text, app.row1.input), 0)
 
 class FlippedBackImage(Image):
@@ -360,7 +360,7 @@ class QuickRatePopup(ModalView):
         self.copy_btn.bind(on_release=self.copy_to_clipboard)
         header.add_widget(x_btn); header.add_widget(title); header.add_widget(self.copy_btn); main_layout.add_widget(header)
         with main_layout.canvas.after: Color(0.9, 0.9, 0.9, 1); Line(points=[0, Window.height-130, Window.width, Window.height-130], width=1)
-        info = Label(text=f"현재 환율: {current_rate} 기준", font_size=32, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT, size_hint_y=None, height=80)
+        info = Label(text=f"현재 환율: {current_rate} 기준", font_size=32, color=MUTED_COLOR, font_name=K_FONT, size_hint_y=None, height=80)
         main_layout.add_widget(info)
         scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
         grid = GridLayout(cols=1, size_hint_y=None, spacing=0) 
@@ -376,7 +376,7 @@ class QuickRatePopup(ModalView):
             box = BoxLayout(orientation='horizontal', size_hint=(1, 1), spacing=5, padding=[10, 0])
             vnd_lbl = Label(text=f"{vnd:,} ₫", font_name=K_FONT, font_size=46, bold=True, color=TEXT_BLACK, size_hint_x=0.40, halign='right', valign='middle')
             vnd_lbl.bind(size=vnd_lbl.setter('text_size'))
-            arrow_lbl = Label(text="→", font_name=K_FONT, font_size=55, color=(0.6, 0.6, 0.6, 1), size_hint_x=0.20, halign='center', valign='middle')
+            arrow_lbl = Label(text="→", font_name=K_FONT, font_size=55, color=MUTED_COLOR, size_hint_x=0.20, halign='center', valign='middle')
             arrow_lbl.bind(size=arrow_lbl.setter('text_size'))
             krw_lbl = Label(text=f"{int(krw):,} 원", font_name=K_FONT, font_size=44, color=app.c_text, size_hint_x=0.40, halign='left', valign='middle')
             krw_lbl.bind(size=krw_lbl.setter('text_size'))
@@ -410,7 +410,7 @@ class ThemeSavePopup(ModalView):
         lbl_box.add_widget(lbl)
         box.add_widget(lbl_box)
         btn_box = BoxLayout(size_hint_y=None, height=110)
-        c_btn = TextButton(text="취소", font_size=32, color=(0.5, 0.5, 0.5, 1), font_name=K_FONT)
+        c_btn = TextButton(text="취소", font_size=32, color=MUTED_COLOR, font_name=K_FONT)
         c_btn.bind(on_release=lambda x: self.dismiss())
         sel_btn = TextButton(text="전체선택", font_size=32, color=(0.3, 0.3, 0.3, 1), font_name=K_FONT)
         def do_select_all(x):
@@ -460,7 +460,7 @@ class CalculatorPopup(Popup):
             self.disp_line_color = Color(*self.main_app.c_main[:3], 0.2)
             self.disp_line = Line(rounded_rectangle=(0,0,0,0,20), width=1.5)
         display_box.bind(pos=self.update_disp_rect, size=self.update_disp_rect)
-        self.formula = Label(text="", font_size=55, color=(0.4, 0.5, 0.5, 1), halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
+        self.formula = Label(text="", font_size=55, color=MUTED_COLOR, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
         self.display = Label(text="", font_size=100, bold=True, color=TEXT_BLACK, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
         display_box.add_widget(self.formula); display_box.add_widget(self.display); main_layout.add_widget(display_box)
         grid = GridLayout(cols=4, spacing=25, size_hint_y=0.62)
@@ -543,11 +543,10 @@ class ExchangeRateApp(App):
         self.memo_input.cursor_color = self.c_main
         self.row1.input.cursor_color = self.c_main
         self.row2.input.cursor_color = self.c_main
-        # ✅ 1원= 색상은 MUTED_COLOR 고정이라 테마 변경 시 업데이트 불필요
 
     def change_theme(self, theme_id):
         self.settings["theme"] = theme_id
-        self.save_all_data()
+        self.save_rate_and_settings()
         self.apply_theme_ui(theme_id)
 
     def update_rate_desc(self):
@@ -564,7 +563,6 @@ class ExchangeRateApp(App):
         self.settings = self.app_data["settings"]
         self.last_saved_memo = self.app_data["memo"]
         initial_rate = self.app_data["rate"]
-        self._auto_save_cb = None
         self.set_theme_colors(self.settings.get("theme", 1))
         
         root = BoxLayout(orientation='vertical', padding=[25, 25], spacing=18)
@@ -581,7 +579,6 @@ class ExchangeRateApp(App):
         self.row2 = CardInput(label_text="KRW", flag_url=FLAG_KR, cursor_c=self.c_main)
         root.add_widget(self.row1); root.add_widget(self.row2)
 
-        # ✅ 비율: 여백(0.02) + 환율글자(0.03) + 입력박스(0.45) + 실시간(0.25) + 위치변경(0.25) = 1.0
         ctrl_area = BoxLayout(orientation='vertical', size_hint_y=None, height=145)
         ctrl_box = BoxLayout(size_hint_y=None, height=100, spacing=15)
         self.rate_in = RateTextInput(
@@ -602,14 +599,12 @@ class ExchangeRateApp(App):
         ctrl_box.add_widget(self.swap_btn)
         ctrl_area.add_widget(ctrl_box)
 
-        # ✅ date_line 도 동일 비율 맞춤: 여백(0.02) + 환율자리(0.03) + 1원=(0.45) + 날짜(0.50) = 1.0
         date_line = BoxLayout(size_hint_y=None, height=45, spacing=15)
         date_line.add_widget(Widget(size_hint_x=0.02))
-        date_line.add_widget(Widget(size_hint_x=0.03))  # 환율 글자 자리 맞춤
+        date_line.add_widget(Widget(size_hint_x=0.03))
         init_desc = f"1원 = {float(initial_rate):.2f}동" if initial_rate else ""
         self.rate_desc_label = Label(
-            text=init_desc, font_size=30,
-            color=MUTED_COLOR,  # ✅ 날짜 색상과 동일
+            text=init_desc, font_size=30, color=MUTED_COLOR,
             font_name=K_FONT, size_hint_x=0.45, bold=True,
             halign='center', valign='middle'
         )
@@ -618,7 +613,7 @@ class ExchangeRateApp(App):
         init_label = f"{datetime.datetime.now().strftime('%y.%m.%d %H:%M')} 수동 입력" if initial_rate else "환율을 업데이트 하세요"
         self.update_label = Label(
             text=init_label, font_size=30, color=MUTED_COLOR,
-            font_name=K_FONT, size_hint_x=0.50,
+            font_name=K_FONT, size_hint_x=0.5,
             halign='left', valign='middle',
             shorten=True, shorten_from='right'
         )
@@ -722,31 +717,41 @@ class ExchangeRateApp(App):
         Clock.schedule_once(_adjust, 0)
 
     def on_memo_text_change(self, instance, value):
+        # ✅ auto_save 켜져 있으면 타이핑마다 즉시 저장
         if self.settings.get("auto_save", False):
-            if self._auto_save_cb:
-                Clock.unschedule(self._auto_save_cb)
-            self._auto_save_cb = Clock.schedule_once(lambda dt: self.save_memo_direct(), 2.0)
+            self.save_memo_direct()
 
     def on_stop(self):
-        self.save_memo_direct()
+        # ✅ 환율/설정 항상 저장, 메모는 auto_save 설정에 따라
+        self.app_data["rate"] = self.rate_in.text
+        self.app_data["settings"] = self.settings
+        if self.settings.get("auto_save", False):
+            self.app_data["memo"] = self.memo_input.text
+        save_data(self.app_data)
 
     def on_pause(self):
-        self.save_memo_direct()
+        # ✅ 환율/설정 항상 저장, 메모는 auto_save 설정에 따라
+        self.app_data["rate"] = self.rate_in.text
+        self.app_data["settings"] = self.settings
+        if self.settings.get("auto_save", False):
+            self.app_data["memo"] = self.memo_input.text
+        save_data(self.app_data)
         return True
 
-    def save_all_data(self):
+    def save_rate_and_settings(self):
+        # ✅ 환율/설정만 저장 (메모 제외)
         self.app_data["rate"] = self.rate_in.text
-        self.app_data["memo"] = self.memo_input.text
         self.app_data["settings"] = self.settings
         save_data(self.app_data)
-    
+
     def save_memo_direct(self):
+        # ✅ 메모 포함 전체 저장 (저장 버튼 or auto_save)
         self.last_saved_memo = self.memo_input.text
         self.app_data["memo"] = self.memo_input.text
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
         save_data(self.app_data)
-    
+
     def update_ui_for_settings(self):
         is_auto_zeros = self.settings.get("auto_zeros", False)
         self.row1.set_auto_zero_mode(is_auto_zeros)
@@ -804,7 +809,7 @@ class ExchangeRateApp(App):
                 now = datetime.datetime.now().strftime("%y.%m.%d %H:%M")
                 self.update_label.text = f"{now} 기준"
                 self.update_rate_desc()
-                self.save_memo_direct()
+                self.save_rate_and_settings()
                 if self.row1.input.text: self.execute_calc(self.row1.input.text, self.row1.input)
             else:
                 self.update_label.text = "업데이트 실패 (서버 오류)"
