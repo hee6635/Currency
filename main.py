@@ -78,6 +78,7 @@ K_FONT = get_safe_font()
 MAIN_BG, CARD_BG = (0.93, 0.94, 0.96, 1), (1, 1, 1, 1)
 TEXT_BLACK = (0.15, 0.15, 0.18, 1)
 NUM_LIGHT_GRAY = (0.92, 0.93, 0.95, 1)
+MUTED_COLOR = (0.5, 0.5, 0.5, 1)  # ✅ 날짜/1원= 공통 색상
 
 Window.clearcolor = MAIN_BG
 
@@ -291,9 +292,15 @@ class SettingsPopup(ModalView):
         header = RelativeLayout(size_hint_y=None, height=130)
         with header.canvas.before: Color(1,1,1,1); Rectangle(pos=(0,0), size=Window.size)
         title = Label(text="설정", font_size=42, bold=True, color=TEXT_BLACK, font_name=K_FONT, pos_hint={'center_x': 0.5, 'center_y': 0.5})
-        self.save_btn = TextButton(text="저장", font_size=36, color=self.main_app.c_main, bold=True, size_hint=(None, None), size=(120, 100), pos_hint={'right': 0.95, 'center_y': 0.5}, font_name=K_FONT)
-        self.save_btn.bind(on_release=self.save_and_close)
-        header.add_widget(title); header.add_widget(self.save_btn); main_layout.add_widget(header)
+        self.settings_save_btn = StyledButton(
+            text="저장", f_size=34, radius=18,
+            bg_color=self.main_app.c_main, t_color=(1,1,1,1),
+            size_hint=(None, None), size=(130, 80),
+            pos_hint={'right': 0.97, 'center_y': 0.5},
+            font_name=K_FONT, bold=True
+        )
+        self.settings_save_btn.bind(on_release=self.save_and_close)
+        header.add_widget(title); header.add_widget(self.settings_save_btn); main_layout.add_widget(header)
         with main_layout.canvas.after: Color(0.9, 0.9, 0.9, 1); Line(points=[0, Window.height-130, Window.width, Window.height-130], width=1)
         scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
         list_grid = GridLayout(cols=1, size_hint_y=None, spacing=10)
@@ -536,7 +543,7 @@ class ExchangeRateApp(App):
         self.memo_input.cursor_color = self.c_main
         self.row1.input.cursor_color = self.c_main
         self.row2.input.cursor_color = self.c_main
-        self.rate_desc_label.color = self.c_main
+        # ✅ 1원= 색상은 MUTED_COLOR 고정이라 테마 변경 시 업데이트 불필요
 
     def change_theme(self, theme_id):
         self.settings["theme"] = theme_id
@@ -574,7 +581,7 @@ class ExchangeRateApp(App):
         self.row2 = CardInput(label_text="KRW", flag_url=FLAG_KR, cursor_c=self.c_main)
         root.add_widget(self.row1); root.add_widget(self.row2)
 
-        # ✅ 환율 영역 레이아웃 수정
+        # ✅ 비율: 여백(0.02) + 환율글자(0.03) + 입력박스(0.45) + 실시간(0.25) + 위치변경(0.25) = 1.0
         ctrl_area = BoxLayout(orientation='vertical', size_hint_y=None, height=145)
         ctrl_box = BoxLayout(size_hint_y=None, height=100, spacing=15)
         self.rate_in = RateTextInput(
@@ -588,18 +595,21 @@ class ExchangeRateApp(App):
         self.live_btn.bind(on_release=lambda x: self.get_rate())
         self.swap_btn = StyledButton(text="⇅ 위치 변경", bg_color=self.c_muted, size_hint_x=0.25, f_size=32, t_color=(1,1,1,1))
         self.swap_btn.bind(on_release=lambda x: self.swap())
-        ctrl_box.add_widget(Label(text="환율", font_size=34, bold=True, size_hint_x=0.05, font_name=K_FONT, color=TEXT_BLACK))
+        ctrl_box.add_widget(Widget(size_hint_x=0.02))
+        ctrl_box.add_widget(Label(text="환율", font_size=34, bold=True, size_hint_x=0.03, font_name=K_FONT, color=TEXT_BLACK))
         ctrl_box.add_widget(self.rate_in)
         ctrl_box.add_widget(self.live_btn)
         ctrl_box.add_widget(self.swap_btn)
         ctrl_area.add_widget(ctrl_box)
 
-        # ✅ 날짜/설명 라인: 환율라벨(0.05) + 1원=설명(rate_in과 같은 0.45 센터) + 날짜(실시간버튼 아래 왼쪽)
+        # ✅ date_line 도 동일 비율 맞춤: 여백(0.02) + 환율자리(0.03) + 1원=(0.45) + 날짜(0.50) = 1.0
         date_line = BoxLayout(size_hint_y=None, height=45, spacing=15)
-        date_line.add_widget(Widget(size_hint_x=0.05))
+        date_line.add_widget(Widget(size_hint_x=0.02))
+        date_line.add_widget(Widget(size_hint_x=0.03))  # 환율 글자 자리 맞춤
         init_desc = f"1원 = {float(initial_rate):.2f}동" if initial_rate else ""
         self.rate_desc_label = Label(
-            text=init_desc, font_size=32, color=self.c_main,
+            text=init_desc, font_size=30,
+            color=MUTED_COLOR,  # ✅ 날짜 색상과 동일
             font_name=K_FONT, size_hint_x=0.45, bold=True,
             halign='center', valign='middle'
         )
@@ -607,7 +617,7 @@ class ExchangeRateApp(App):
         date_line.add_widget(self.rate_desc_label)
         init_label = f"{datetime.datetime.now().strftime('%y.%m.%d %H:%M')} 수동 입력" if initial_rate else "환율을 업데이트 하세요"
         self.update_label = Label(
-            text=init_label, font_size=32, color=(0.5, 0.5, 0.5, 1),
+            text=init_label, font_size=30, color=MUTED_COLOR,
             font_name=K_FONT, size_hint_x=0.50,
             halign='left', valign='middle',
             shorten=True, shorten_from='right'
