@@ -12,10 +12,9 @@ from kivy.uix.popup import Popup
 from kivy.uix.modalview import ModalView
 from kivy.uix.image import Image
 from kivy.uix.widget import Widget
-from kivy.uix.switch import Switch
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.core.window import Window
-from kivy.graphics import Color, RoundedRectangle, Line, PushMatrix, PopMatrix, Scale, Ellipse, Rectangle 
+from kivy.graphics import Color, RoundedRectangle, Line, PushMatrix, PopMatrix, Ellipse, Rectangle 
 from kivy.clock import Clock
 from kivy.uix.scrollview import ScrollView
 from kivy.core.clipboard import Clipboard
@@ -30,14 +29,7 @@ try:
 except:
     ANDROID = False
 
-if ANDROID:
-    @run_on_ui_thread
-    def set_resize_mode():
-        activity = PythonActivity.mActivity
-        activity.getWindow().setSoftInputMode(0x30)
-    set_resize_mode()
-
-Window.softinput_mode = ''
+Window.softinput_mode = 'resize'
 
 DATA_FILE = "app_data.json"
 ICON_SET = "set.png"      
@@ -271,14 +263,6 @@ class RateTextInput(TextInput):
         app.save_rate_and_settings()
         Clock.schedule_once(lambda dt: app.execute_calc(app.row1.input.text, app.row1.input), 0)
 
-class FlippedBackImage(Image):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        with self.canvas.before: PushMatrix(); self.scale = Scale(-1, 1, 1)
-        with self.canvas.after: PopMatrix()
-        self.bind(pos=self.update_transform, size=self.update_transform)
-    def update_transform(self, *args): self.scale.origin = self.center
-
 class SettingsPopup(ModalView):
     def __init__(self, main_app, **kwargs):
         super().__init__(**kwargs)
@@ -445,12 +429,12 @@ class HerbPopup(ModalView):
     def on_touch_down(self, touch):
         self.dismiss(); return True
 
-class CalculatorPopup(Popup):
+class CalculatorPopup(ModalView):
     def __init__(self, main_app, target_row, **kwargs):
         super().__init__(**kwargs)
         self.main_app, self.target_row = main_app, target_row
-        self.title, self.title_font, self.size_hint = "환율 계산 패드", K_FONT, (1, 0.98) 
-        self.title_color, self.background = TEXT_BLACK, ""
+        self.size_hint = (1, 1)
+        self.background = ""
         main_layout = BoxLayout(orientation='vertical', padding=[25, 25], spacing=20)
         with main_layout.canvas.before: Color(*MAIN_BG); self.bg_rect = RoundedRectangle(pos=main_layout.pos, size=main_layout.size)
         main_layout.bind(pos=self.update_bg, size=self.update_bg)
@@ -478,7 +462,7 @@ class CalculatorPopup(Popup):
         self.apply_btn = StyledButton(text="금액 적용하기", bg_color=self.main_app.c_main, size_hint_y=0.14, f_size=55, radius=20, t_color=(1,1,1,1))
         self.apply_btn.bind(on_release=self.apply)
         main_layout.add_widget(self.apply_btn)
-        self.content = main_layout
+        self.add_widget(main_layout)
 
     def update_bg(self, instance, value): self.bg_rect.pos, self.bg_rect.size = instance.pos, instance.size
     def update_disp_rect(self, instance, value): self.disp_rect.pos, self.disp_rect.size = instance.pos, instance.size; self.disp_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 20)
@@ -557,6 +541,9 @@ class ExchangeRateApp(App):
         else:
             self.rate_desc_label.text = ""
 
+    def add_bottom_newlines(self, text, count=20):
+        return text.rstrip('\n') + '\n' * count
+
     def build(self):
         self.is_swapped, self.is_updating = False, False
         self.app_data = load_data()
@@ -613,7 +600,7 @@ class ExchangeRateApp(App):
         init_label = f"{datetime.datetime.now().strftime('%y.%m.%d %H:%M')} 수동 입력" if initial_rate else "환율을 업데이트 하세요"
         self.update_label = Label(
             text=init_label, font_size=30, color=MUTED_COLOR,
-            font_name=K_FONT, size_hint_x=0.5,
+            font_name=K_FONT, size_hint_x=0.50,
             halign='left', valign='middle',
             shorten=True, shorten_from='right'
         )
@@ -641,6 +628,7 @@ class ExchangeRateApp(App):
         memo_container.add_widget(memo_header)
         self.memo_scroll = ScrollView(
             do_scroll_x=False, do_scroll_y=True,
+            always_overscroll=False,
             bar_width=15, bar_margin=12,
             scroll_type=['bars', 'content'],
             bar_color=(0.5, 0.5, 0.5, 0.6),
@@ -648,7 +636,8 @@ class ExchangeRateApp(App):
             size_hint=(1, 1)
         )
         self.memo_input = TextInput(
-            text=self.last_saved_memo, font_size=40,
+            text=self.add_bottom_newlines(self.last_saved_memo),
+            font_size=40,
             background_color=(0,0,0,0), foreground_color=TEXT_BLACK,
             padding=[30, 20, 30, 20], font_name=K_FONT,
             multiline=True, line_height=1.2,
@@ -677,20 +666,9 @@ class ExchangeRateApp(App):
     def on_memo_focus(self, instance, value):
         if value:
             Animation(height=0, opacity=0, duration=0.2, t='out_quad').start(self.bottom_box)
-            def _apply_padding(dt):
-                if not instance.focus: return
-                saved_cursor = instance.cursor
-                instance.padding = [30, 20, 30, Window.height * 0.6]
-                def _restore(dt2):
-                    if not instance.focus: return
-                    instance.cursor = (0, 0)
-                    instance.cursor = saved_cursor
-                    self.ensure_cursor_visible()
-                Clock.schedule_once(_restore, 0.05)
-            Clock.schedule_once(_apply_padding, 0.1)
+            Clock.schedule_once(lambda dt: self.ensure_cursor_visible(), 0.3)
         else:
             Animation(height=180, opacity=1, duration=0.2, t='out_quad').start(self.bottom_box)
-            instance.padding = [30, 20, 30, 20]
 
     def ensure_cursor_visible(self, *args):
         if not self.memo_input.focus:
@@ -717,12 +695,10 @@ class ExchangeRateApp(App):
         Clock.schedule_once(_adjust, 0)
 
     def on_memo_text_change(self, instance, value):
-        # ✅ auto_save 켜져 있으면 타이핑마다 즉시 저장
         if self.settings.get("auto_save", False):
             self.save_memo_direct()
 
     def on_stop(self):
-        # ✅ 환율/설정 항상 저장, 메모는 auto_save 설정에 따라
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
         if self.settings.get("auto_save", False):
@@ -730,7 +706,6 @@ class ExchangeRateApp(App):
         save_data(self.app_data)
 
     def on_pause(self):
-        # ✅ 환율/설정 항상 저장, 메모는 auto_save 설정에 따라
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
         if self.settings.get("auto_save", False):
@@ -739,13 +714,11 @@ class ExchangeRateApp(App):
         return True
 
     def save_rate_and_settings(self):
-        # ✅ 환율/설정만 저장 (메모 제외)
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
         save_data(self.app_data)
 
     def save_memo_direct(self):
-        # ✅ 메모 포함 전체 저장 (저장 버튼 or auto_save)
         self.last_saved_memo = self.memo_input.text
         self.app_data["memo"] = self.memo_input.text
         self.app_data["rate"] = self.rate_in.text
