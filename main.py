@@ -44,7 +44,7 @@ def load_data():
     default_data = {
         "rate": "", 
         "memo": "※ 최신 복사 내용만 붙여넣기 지원\n\n여행 메모  (예시)\n1만동 = 약 550원\n5만동 = 약 2,800원\n\n오늘 할일\n야시장 가기",
-        "settings": {"auto_update": True, "auto_zeros": False, "round_krw": False, "auto_font": False, "auto_save": False, "theme": 1}
+        "settings": {"auto_update": True, "auto_zeros": False, "round_krw": False, "auto_font": False, "auto_save": False, "calc_preview": True, "theme": 1}
     }
     if os.path.exists(DATA_FILE):
         try:
@@ -52,7 +52,7 @@ def load_data():
                 data = json.load(f)
                 if "settings" not in data: data["settings"] = default_data["settings"]
                 else:
-                    for k in ["round_krw", "auto_font", "auto_save", "theme"]:
+                    for k in ["round_krw", "auto_font", "auto_save", "calc_preview", "theme"]:
                         if k not in data["settings"]: data["settings"][k] = default_data["settings"][k]
                 return data
         except: pass
@@ -236,10 +236,10 @@ class AutoPasteMemoInput(TextInput):
         if substring == "\n":
             app.burst_newlines += 1
         is_paste_like = (
-    app.burst_newlines >= 3 or
-    app.burst_count >= 4 or
-    len(substring) >= 6
-)
+            app.burst_newlines >= 3 or
+            app.burst_count >= 4 or
+            len(substring) >= 6
+        )
         if is_paste_like:
             Clock.unschedule(app.replace_with_clipboard)
             Clock.schedule_once(app.replace_with_clipboard, 0.08)
@@ -331,7 +331,8 @@ class SettingsPopup(ModalView):
             ("auto_zeros", "VND 입력 시 000 생략 (K)"),
             ("round_krw", "KRW 100원 단위 반올림"),
             ("auto_font", "금액 길이에 맞춰 폰트 자동 조절"),
-            ("auto_save", "메모 자동 저장 (버튼 불필요)")
+            ("auto_save", "메모 자동 저장 (버튼 불필요)"),
+            ("calc_preview", "계산기 환율 미리보기"),
         ]
         for k, t in s_list:
             row = UnderlineLayout(size_hint_y=None, height=120)
@@ -346,7 +347,7 @@ class SettingsPopup(ModalView):
         
     def save_and_close(self, inst):
         self.is_saved = True
-        for k in ["auto_update", "auto_zeros", "round_krw", "auto_font", "auto_save"]:
+        for k in ["auto_update", "auto_zeros", "round_krw", "auto_font", "auto_save", "calc_preview"]:
             self.main_app.settings[k] = getattr(self, f"sw_{k}").active
         self.main_app.change_theme(self.theme_sw.theme_id) 
         self.main_app.update_ui_for_settings()
@@ -470,7 +471,8 @@ class CalculatorPopup(ModalView):
         main_layout = BoxLayout(orientation='vertical', padding=[25, 25], spacing=20)
         with main_layout.canvas.before: Color(*MAIN_BG); self.bg_rect = RoundedRectangle(pos=main_layout.pos, size=main_layout.size)
         main_layout.bind(pos=self.update_bg, size=self.update_bg)
-        display_box = BoxLayout(orientation='vertical', size_hint_y=0.25, padding=[25, 15])
+
+        display_box = BoxLayout(orientation='vertical', size_hint_y=0.28, padding=[25, 10])
         with display_box.canvas.before: 
             Color(1, 1, 1, 1); self.disp_rect = RoundedRectangle(pos=display_box.pos, size=display_box.size, radius=[20,])
             self.disp_line_color = Color(*self.main_app.c_main[:3], 0.2)
@@ -478,8 +480,14 @@ class CalculatorPopup(ModalView):
         display_box.bind(pos=self.update_disp_rect, size=self.update_disp_rect)
         self.formula = Label(text="", font_size=55, color=MUTED_COLOR, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
         self.display = Label(text="", font_size=100, bold=True, color=TEXT_BLACK, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
-        display_box.add_widget(self.formula); display_box.add_widget(self.display); main_layout.add_widget(display_box)
-        grid = GridLayout(cols=4, spacing=25, size_hint_y=0.62)
+        # ✅ 환율 미리보기 라벨
+        self.converted_label = Label(text="", font_size=36, color=MUTED_COLOR, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
+        display_box.add_widget(self.formula)
+        display_box.add_widget(self.display)
+        display_box.add_widget(self.converted_label)
+        main_layout.add_widget(display_box)
+
+        grid = GridLayout(cols=4, spacing=25, size_hint_y=0.58)
         c_sub = self.main_app.c_sub
         btns = [['7', NUM_LIGHT_GRAY], ['8', NUM_LIGHT_GRAY], ['9', NUM_LIGHT_GRAY], ['/', c_sub], ['4', NUM_LIGHT_GRAY], ['5', NUM_LIGHT_GRAY], ['6', NUM_LIGHT_GRAY], ['*', c_sub], ['1', NUM_LIGHT_GRAY], ['2', NUM_LIGHT_GRAY], ['3', NUM_LIGHT_GRAY], ['-', c_sub], ['C', (1, 0.88, 0.88, 1)], ['0', NUM_LIGHT_GRAY], ['BACKSPACE', NUM_LIGHT_GRAY], ['+', c_sub], ['00', NUM_LIGHT_GRAY], ['000', NUM_LIGHT_GRAY], ['0000', NUM_LIGHT_GRAY], ['FLAG', (0.9, 0.94, 1, 1)]]
         for txt, clr in btns:
@@ -498,34 +506,78 @@ class CalculatorPopup(ModalView):
 
     def update_bg(self, instance, value): self.bg_rect.pos, self.bg_rect.size = instance.pos, instance.size
     def update_disp_rect(self, instance, value): self.disp_rect.pos, self.disp_rect.size = instance.pos, instance.size; self.disp_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 20)
-    def toggle_currency(self, inst): self.main_app.swap(); self.target_row = self.main_app.row1; self.pop_flag_img.source = self.target_row.flag_img.source
+    def toggle_currency(self, inst): self.main_app.swap(); self.target_row = self.main_app.row1; self.pop_flag_img.source = self.target_row.flag_img.source; self.update_converted()
+
+    # ✅ 환율 미리보기 업데이트
+    def update_converted(self):
+        if not self.main_app.settings.get("calc_preview", True):
+            self.converted_label.text = ""
+            return
+        try:
+            r_text = self.main_app.rate_in.text
+            if not r_text: return
+            r = float(r_text)
+            curr_disp = self.display.text.replace(',', '')
+            if not curr_disp:
+                self.converted_label.text = ""
+                return
+            v = float(curr_disp)
+            is_vnd = FLAG_VN in self.target_row.flag_img.source
+            if is_vnd:
+                # VND 입력 → 원화 표시
+                result = v / r
+                if self.main_app.settings.get("round_krw", False):
+                    result = int((result + 50) // 100) * 100
+                self.converted_label.text = f"≈ {int(result):,}원"
+            else:
+                # KRW 입력 → 동화 표시
+                result = v * r
+                is_auto_zeros = self.main_app.settings.get("auto_zeros", False)
+                if is_auto_zeros:
+                    # ✅ K모드 켜져있으면 K동으로 표시
+                    self.converted_label.text = f"≈ {int(result/1000):,}K동"
+                else:
+                    self.converted_label.text = f"≈ {int(result):,}동"
+        except:
+            self.converted_label.text = ""
+
     def on_key_press(self, key):
         curr_disp = self.display.text.replace(',', ''); curr_form = self.formula.text.replace(',', '')
-        if key == 'C': self.formula.text, self.display.text = "", ""
+        if key == 'C':
+            self.formula.text, self.display.text = "", ""
+            self.converted_label.text = ""
         elif key == 'BACK':
-            if curr_disp: new_v = curr_disp[:-1]; self.display.text = "{:,}".format(int(new_v)) if new_v else ""
+            if curr_disp:
+                new_v = curr_disp[:-1]; self.display.text = "{:,}".format(int(new_v)) if new_v else ""
+                self.update_converted()
             elif curr_form:
                 parts = curr_form.strip().split(' ')
                 if parts:
                     last = parts.pop()
                     if last in '+-*/' and parts: self.display.text = parts.pop(); self.formula.text = " ".join(parts) + " " if parts else ""
                     else: self.formula.text = " ".join(parts)
+                self.converted_label.text = ""
         elif key in '+-*/':
             if curr_disp: self.formula.text += "{:,}".format(int(curr_disp)) + " " + key + " "; self.display.text = ""
             elif curr_form:
                 f_strip = curr_form.strip()
                 if f_strip and f_strip[-1] in '+-*/': self.formula.text = f_strip[:-1] + " " + key + " "
+            self.converted_label.text = ""  # ✅ 사칙연산 시 숨김
         else:
             if "=" in self.formula.text: self.formula.text, self.display.text = "", ""
             new_v = curr_disp + key
-            if new_v.isdigit(): self.display.text = "{:,}".format(int(new_v))
+            if new_v.isdigit():
+                self.display.text = "{:,}".format(int(new_v))
+                self.update_converted()  # ✅ 숫자 입력 시 업데이트
         self.apply_btn.text = "연산 결과 확인" if self.formula.text and "=" not in self.formula.text else "금액 적용하기"
+
     def apply(self, inst):
         if self.formula.text and "=" not in self.formula.text:
             try:
                 expr = (self.formula.text + self.display.text).replace(',', ''); res = str(eval(expr)); res = res.split('.')[0] if '.' in res and res.split('.')[1] == '0' else res
                 self.formula.text += self.display.text + " ="; self.display.text = "{:,}".format(int(float(res))); self.apply_btn.text = "금액 적용하기"
-            except: self.display.text, self.formula.text = "Error", ""
+                self.update_converted()  # ✅ 연산결과 확인 후 업데이트
+            except: self.display.text, self.formula.text = "Error", ""; self.converted_label.text = ""
         else:
             val = self.display.text.replace(',', '')
             if val and (val.replace('.','',1).isdigit()):
@@ -765,7 +817,6 @@ class ExchangeRateApp(App):
         Clock.schedule_once(_adjust, 0)
 
     def on_memo_text_change(self, instance, value):
-        # ✅ auto_save 켜져있을 때만 자동저장
         if self.settings.get("auto_save", False):
             self.save_memo_direct()
 
@@ -773,7 +824,6 @@ class ExchangeRateApp(App):
         self.memo_input.focus = False
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
-        # ✅ auto_save 켜져있을 때만 메모 저장
         if self.settings.get("auto_save", False):
             self.app_data["memo"] = self.memo_input.text
         save_data(self.app_data)
@@ -782,7 +832,6 @@ class ExchangeRateApp(App):
         self.memo_input.focus = False
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
-        # ✅ auto_save 켜져있을 때만 메모 저장
         if self.settings.get("auto_save", False):
             self.app_data["memo"] = self.memo_input.text
         save_data(self.app_data)
