@@ -20,8 +20,13 @@ version = 0.1
 # (str) Icon of the application
 icon.filename = icon.png
 
+# (str) Presplash of the application
+presplash.filename = presplash_keyring.png
+
+# (str) Presplash background color
+android.presplash_color = #F4F4F4
+
 # (list) Application requirements
-# 🔥 핵심: 환율 정보를 위해 requests, certifi, openssl을 반드시 포함해야 합니다.
 requirements = python3,kivy==2.3.0,requests,certifi,openssl
 
 # (str) Supported orientation (one of landscape, sensorLandscape, portrait or all)
@@ -37,10 +42,10 @@ android.api = 33
 android.minapi = 21
 
 # (int) Android SDK directory (if empty, it will be automatically downloaded.)
-# android.sdk = 
+# android.sdk =
 
 # (int) Android NDK directory (if empty, it will be automatically downloaded.)
-# android.ndk = 
+# android.ndk =
 
 # (int) Android NDK API to use. Is this the minimum API your app will support?
 android.ndk_api = 21
@@ -49,7 +54,6 @@ android.ndk_api = 21
 # android.use_posix = 1
 
 # (list) The Android archs to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
-# 🔥 최신 폰을 타겟팅하며 빌드 속도를 높이기 위해 arm64-v8a를 권장합니다.
 android.archs = arm64-v8a
 
 # (bool) Allow backup
@@ -59,25 +63,26 @@ android.allow_backup = True
 android.logcat_filters = *:S python:D
 
 # (str) Android additional libraries to copy to libs/armeabi
-#android.add_libs_armeabi = lib/armeabi/*.so
+# android.add_libs_armeabi = lib/armeabi/*.so
 
-# 🔥 [핵심 설정] 키보드가 올라올 때 레이아웃을 재조정하여 제목을 고정합니다.
+# (str) Android manifest attributes
 android.manifest.attributes = android:windowSoftInputMode="adjustResize"
 
 # (bool) Fullscreen mode
 fullscreen = 0
 
 # (list) Android additional Java classes to add to the manifest.
-#android.add_src =
+# android.add_src =
 
 # (list) Android service definitions
-#services =
+# services =
 
 # (bool) Copy library instead of making a libpysdl.so
-#android.copy_libs = 1
+# android.copy_libs = 1
 
 # (list) The Android SDK license to accept
 android.accept_sdk_license = True
+
 
 [buildozer]
 # (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
