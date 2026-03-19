@@ -215,7 +215,6 @@ class CommaTextInput(TextInput):
             app.execute_calc(raw, self)
         except: pass
 
-# ✅ 붙여넣기 버그 수정 - 버스트 감지 후 클립보드 원본으로 직접 교체
 class AutoPasteMemoInput(TextInput):
     def insert_text(self, substring, from_undo=False):
         app = App.get_running_app()
@@ -236,10 +235,7 @@ class AutoPasteMemoInput(TextInput):
         app.burst_count += 1
         if substring == "\n":
             app.burst_newlines += 1
-        is_paste_like = (
-            
-            len(substring) >= 5
-        )
+        is_paste_like = (len(substring) >= 5)
         if is_paste_like:
             Clock.unschedule(app.replace_with_clipboard)
             Clock.schedule_once(app.replace_with_clipboard, 0.08)
@@ -765,28 +761,30 @@ class ExchangeRateApp(App):
         Clock.schedule_once(_adjust, 0)
 
     def on_memo_text_change(self, instance, value):
+        # ✅ auto_save 켜져있을 때만 자동저장
         if self.settings.get("auto_save", False):
             self.save_memo_direct()
 
     def on_stop(self):
-        # ✅ 포커스 해제 후 저장
         self.memo_input.focus = False
-        self.app_data["memo"] = self.memo_input.text
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
+        # ✅ auto_save 켜져있을 때만 메모 저장
+        if self.settings.get("auto_save", False):
+            self.app_data["memo"] = self.memo_input.text
         save_data(self.app_data)
 
     def on_pause(self):
-        # ✅ 포커스 명시적 해제 → 돌아왔을 때 키보드 정상 작동
         self.memo_input.focus = False
-        self.app_data["memo"] = self.memo_input.text
         self.app_data["rate"] = self.rate_in.text
         self.app_data["settings"] = self.settings
+        # ✅ auto_save 켜져있을 때만 메모 저장
+        if self.settings.get("auto_save", False):
+            self.app_data["memo"] = self.memo_input.text
         save_data(self.app_data)
         return True
 
     def on_resume(self):
-        # ✅ 복귀 시 키보드 모드 재설정
         Window.softinput_mode = 'resize'
 
     def save_rate_and_settings(self):
