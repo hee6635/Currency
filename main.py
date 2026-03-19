@@ -318,30 +318,42 @@ class SettingsPopup(ModalView):
         self.settings_save_btn.bind(on_release=self.save_and_close)
         header.add_widget(title); header.add_widget(self.settings_save_btn); main_layout.add_widget(header)
         with main_layout.canvas.after: Color(0.9, 0.9, 0.9, 1); Line(points=[0, Window.height-130, Window.width, Window.height-130], width=1)
-        scroll = ScrollView(do_scroll_x=False, do_scroll_y=False) 
-        list_grid = GridLayout(cols=1, size_hint_y=None, spacing=10)
+        scroll = ScrollView(do_scroll_x=False, do_scroll_y=True)
+        list_grid = GridLayout(cols=1, size_hint_y=None, spacing=0)
         list_grid.bind(minimum_height=list_grid.setter('height'))
-        theme_row = UnderlineLayout(size_hint_y=None, height=140)
-        theme_lbl = Label(text="앱 테마 변경\n(블루/기본/다크)", font_name=K_FONT, font_size=32, color=TEXT_BLACK, size_hint=(0.6, 1), pos_hint={'x': 0.02, 'center_y': 0.5}, halign='left', valign='middle')
-        theme_lbl.bind(size=theme_lbl.setter('text_size'))
+
+        # 테마 행
+        theme_row = UnderlineLayout(size_hint_y=None, height=160)
+        theme_text_box = BoxLayout(orientation='vertical', size_hint=(0.65, 1), pos_hint={'x': 0.02, 'center_y': 0.5})
+        theme_title = Label(text="앱 테마 변경", font_name=K_FONT, font_size=34, color=TEXT_BLACK, halign='left', valign='middle', size_hint_y=0.5)
+        theme_title.bind(size=theme_title.setter('text_size'))
+        theme_desc = Label(text="블루 / 기본(오렌지) / 다크 중 선택", font_name=K_FONT, font_size=26, color=MUTED_COLOR, halign='left', valign='middle', size_hint_y=0.5)
+        theme_desc.bind(size=theme_desc.setter('text_size'))
+        theme_text_box.add_widget(theme_title); theme_text_box.add_widget(theme_desc)
         self.theme_sw = ThemePillSwitch(main_app=self.main_app, pos_hint={'right': 0.98, 'center_y': 0.5})
-        theme_row.add_widget(theme_lbl); theme_row.add_widget(self.theme_sw); list_grid.add_widget(theme_row)
+        theme_row.add_widget(theme_text_box); theme_row.add_widget(self.theme_sw); list_grid.add_widget(theme_row)
+
         s_list = [
-            ("auto_update", "시작 시 환율 자동 업데이트"),
-            ("auto_zeros", "VND 입력 시 000 생략 (K)"),
-            ("round_krw", "KRW 100원 단위 반올림"),
-            ("auto_font", "금액 길이에 맞춰 폰트 자동 조절"),
-            ("auto_save", "메모 자동 저장 (버튼 불필요)"),
-            ("calc_preview", "계산기 환율 미리보기"),
+            ("auto_update", "시작 시 환율 자동 업데이트", "앱 실행 시 최신 환율을 자동으로 가져옵니다"),
+            ("auto_zeros", "VND 입력 시 000 생략 (K)", "50K = 50,000동으로 계산됩니다"),
+            ("round_krw", "KRW 100원 단위 반올림", "2,853원 → 2,900원으로 반올림됩니다"),
+            ("auto_font", "금액 길이에 맞춰 폰트 자동 조절", "긴 금액 입력 시 글자 크기가 줄어듭니다"),
+            ("auto_save", "메모 자동 저장 (버튼 불필요)", "글자 입력 즉시 자동으로 저장됩니다"),
+            ("calc_preview", "계산기 환율 미리보기", "계산기 입력 시 환산 금액을 미리 보여줍니다"),
         ]
-        for k, t in s_list:
-            row = UnderlineLayout(size_hint_y=None, height=120)
-            lbl = Label(text=t, font_name=K_FONT, font_size=34, color=TEXT_BLACK, size_hint=(0.7, 1), pos_hint={'x': 0.02, 'center_y': 0.5}, halign='left', valign='middle')
-            lbl.bind(size=lbl.setter('text_size'))
+        for k, t, desc in s_list:
+            row = UnderlineLayout(size_hint_y=None, height=155)
+            text_box = BoxLayout(orientation='vertical', size_hint=(0.72, None), height=155, pos_hint={'x': 0.02, 'center_y': 0.5}, padding=[0, 20, 0, 20])
+            title_lbl = Label(text=t, font_name=K_FONT, font_size=34, color=TEXT_BLACK, halign='left', valign='middle', size_hint_y=None, height=55)
+            title_lbl.bind(size=title_lbl.setter('text_size'))
+            desc_lbl = Label(text=desc, font_name=K_FONT, font_size=26, color=MUTED_COLOR, halign='left', valign='top', size_hint_y=None, height=55)
+            desc_lbl.bind(size=desc_lbl.setter('text_size'))
+            text_box.add_widget(title_lbl); text_box.add_widget(desc_lbl)
             sw = PillSwitch(active_color=self.main_app.c_main, active=bool(self.main_app.settings.get(k, False)), pos_hint={'right': 0.98, 'center_y': 0.5})
             setattr(self, f"sw_{k}", sw)
-            row.add_widget(lbl); row.add_widget(sw); list_grid.add_widget(row)
-        list_grid.add_widget(Widget(size_hint_y=None, height=Window.height*0.3))
+            row.add_widget(text_box); row.add_widget(sw); list_grid.add_widget(row)
+
+        list_grid.add_widget(Widget(size_hint_y=None, height=100))
         scroll.add_widget(list_grid); main_layout.add_widget(scroll)
         self.add_widget(main_layout)
         
@@ -471,7 +483,6 @@ class CalculatorPopup(ModalView):
         main_layout = BoxLayout(orientation='vertical', padding=[25, 25], spacing=20)
         with main_layout.canvas.before: Color(*MAIN_BG); self.bg_rect = RoundedRectangle(pos=main_layout.pos, size=main_layout.size)
         main_layout.bind(pos=self.update_bg, size=self.update_bg)
-
         display_box = BoxLayout(orientation='vertical', size_hint_y=0.28, padding=[25, 10])
         with display_box.canvas.before: 
             Color(1, 1, 1, 1); self.disp_rect = RoundedRectangle(pos=display_box.pos, size=display_box.size, radius=[20,])
@@ -480,13 +491,9 @@ class CalculatorPopup(ModalView):
         display_box.bind(pos=self.update_disp_rect, size=self.update_disp_rect)
         self.formula = Label(text="", font_size=55, color=MUTED_COLOR, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
         self.display = Label(text="", font_size=100, bold=True, color=TEXT_BLACK, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
-        # ✅ 환율 미리보기 라벨
         self.converted_label = Label(text="", font_size=36, color=MUTED_COLOR, halign='right', text_size=(Window.width*0.8, None), font_name=K_FONT)
-        display_box.add_widget(self.formula)
-        display_box.add_widget(self.display)
-        display_box.add_widget(self.converted_label)
+        display_box.add_widget(self.formula); display_box.add_widget(self.display); display_box.add_widget(self.converted_label)
         main_layout.add_widget(display_box)
-
         grid = GridLayout(cols=4, spacing=25, size_hint_y=0.58)
         c_sub = self.main_app.c_sub
         btns = [['7', NUM_LIGHT_GRAY], ['8', NUM_LIGHT_GRAY], ['9', NUM_LIGHT_GRAY], ['/', c_sub], ['4', NUM_LIGHT_GRAY], ['5', NUM_LIGHT_GRAY], ['6', NUM_LIGHT_GRAY], ['*', c_sub], ['1', NUM_LIGHT_GRAY], ['2', NUM_LIGHT_GRAY], ['3', NUM_LIGHT_GRAY], ['-', c_sub], ['C', (1, 0.88, 0.88, 1)], ['0', NUM_LIGHT_GRAY], ['BACKSPACE', NUM_LIGHT_GRAY], ['+', c_sub], ['00', NUM_LIGHT_GRAY], ['000', NUM_LIGHT_GRAY], ['0000', NUM_LIGHT_GRAY], ['FLAG', (0.9, 0.94, 1, 1)]]
@@ -508,7 +515,6 @@ class CalculatorPopup(ModalView):
     def update_disp_rect(self, instance, value): self.disp_rect.pos, self.disp_rect.size = instance.pos, instance.size; self.disp_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 20)
     def toggle_currency(self, inst): self.main_app.swap(); self.target_row = self.main_app.row1; self.pop_flag_img.source = self.target_row.flag_img.source; self.update_converted()
 
-    # ✅ 환율 미리보기 업데이트
     def update_converted(self):
         if not self.main_app.settings.get("calc_preview", True):
             self.converted_label.text = ""
@@ -524,17 +530,14 @@ class CalculatorPopup(ModalView):
             v = float(curr_disp)
             is_vnd = FLAG_VN in self.target_row.flag_img.source
             if is_vnd:
-                # VND 입력 → 원화 표시
                 result = v / r
                 if self.main_app.settings.get("round_krw", False):
                     result = int((result + 50) // 100) * 100
                 self.converted_label.text = f"≈ {int(result):,}원"
             else:
-                # KRW 입력 → 동화 표시
                 result = v * r
                 is_auto_zeros = self.main_app.settings.get("auto_zeros", False)
                 if is_auto_zeros:
-                    # ✅ K모드 켜져있으면 K동으로 표시
                     self.converted_label.text = f"≈ {int(result/1000):,}K동"
                 else:
                     self.converted_label.text = f"≈ {int(result):,}동"
@@ -562,13 +565,13 @@ class CalculatorPopup(ModalView):
             elif curr_form:
                 f_strip = curr_form.strip()
                 if f_strip and f_strip[-1] in '+-*/': self.formula.text = f_strip[:-1] + " " + key + " "
-            self.converted_label.text = ""  # ✅ 사칙연산 시 숨김
+            self.converted_label.text = ""
         else:
             if "=" in self.formula.text: self.formula.text, self.display.text = "", ""
             new_v = curr_disp + key
             if new_v.isdigit():
                 self.display.text = "{:,}".format(int(new_v))
-                self.update_converted()  # ✅ 숫자 입력 시 업데이트
+                self.update_converted()
         self.apply_btn.text = "연산 결과 확인" if self.formula.text and "=" not in self.formula.text else "금액 적용하기"
 
     def apply(self, inst):
@@ -576,7 +579,7 @@ class CalculatorPopup(ModalView):
             try:
                 expr = (self.formula.text + self.display.text).replace(',', ''); res = str(eval(expr)); res = res.split('.')[0] if '.' in res and res.split('.')[1] == '0' else res
                 self.formula.text += self.display.text + " ="; self.display.text = "{:,}".format(int(float(res))); self.apply_btn.text = "금액 적용하기"
-                self.update_converted()  # ✅ 연산결과 확인 후 업데이트
+                self.update_converted()
             except: self.display.text, self.formula.text = "Error", ""; self.converted_label.text = ""
         else:
             val = self.display.text.replace(',', '')
@@ -903,18 +906,27 @@ class ExchangeRateApp(App):
         
     def get_rate(self):
         try:
-            data = requests.get("https://open.er-api.com/v6/latest/KRW", timeout=3).json() 
+            # ✅ USD 기준 우회로 VND/KRW 계산
+            data = requests.get(
+                "https://open.er-api.com/v6/latest/USD",
+                timeout=3).json()
             if data['result'] == 'success':
-                self.rate_in.text = f"{data['rates']['VND']:.2f}"
+                krw = data['rates']['KRW']
+                vnd = data['rates']['VND']
+                rate = vnd / krw
+                self.rate_in.text = f"{rate:.2f}"
                 now = datetime.datetime.now().strftime("%y.%m.%d %H:%M")
                 self.update_label.text = f"{now} 기준"
+                self.update_label.color = MUTED_COLOR
                 self.update_rate_desc()
                 self.save_rate_and_settings()
                 if self.row1.input.text: self.execute_calc(self.row1.input.text, self.row1.input)
             else:
                 self.update_label.text = "업데이트 실패 (서버 오류)"
+                self.update_label.color = (0.85, 0.25, 0.25, 1)
         except: 
             self.update_label.text = "업데이트 실패 (인터넷 확인)"
+            self.update_label.color = (0.85, 0.25, 0.25, 1)
 
 if __name__ == "__main__":
     ExchangeRateApp().run()
