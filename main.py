@@ -235,7 +235,11 @@ class AutoPasteMemoInput(TextInput):
         app.burst_count += 1
         if substring == "\n":
             app.burst_newlines += 1
-        is_paste_like = (len(substring) >= 5)
+        is_paste_like = (
+    app.burst_newlines >= 3 or
+    app.burst_count >= 4 or
+    len(substring) >= 6
+)
         if is_paste_like:
             Clock.unschedule(app.replace_with_clipboard)
             Clock.schedule_once(app.replace_with_clipboard, 0.08)
@@ -609,7 +613,7 @@ class ExchangeRateApp(App):
         self.last_input_time = 0.0
         self.last_replace_time = 0.0
         self.replace_cooldown = 0.45
-        self.burst_window = 0.12
+        self.burst_window = 0.03
         self.burst_count = 0
         self.burst_newlines = 0
         self.burst_started = False
