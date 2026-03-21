@@ -1497,22 +1497,31 @@ class ExchangeRateApp(App):
         self.memo_line.rounded_rectangle = (instance.x, instance.y, instance.width, instance.height, 25)
 
     def swap(self):
-        self.is_updating = True
+        self.is_updating = True  # 계산 꼬임 방지 (재계산 락 걸기)
+        
+        # 기존 값 백업
         v1, v2 = self.row1.input.text, self.row2.input.text
         u1, u2 = self.row1.unit_label.text, self.row2.unit_label.text
         self.is_swapped = not self.is_swapped
 
+        # 국기 이미지 변경
         if self.is_swapped:
-            self.row1.name_label.text, self.row1.flag_img.source = "KRW", FLAG_KR
-            self.row2.name_label.text, self.row2.flag_img.source = "VND", FLAG_VN
+            self.row1.flag_img.source = FLAG_KR
+            self.row2.flag_img.source = FLAG_VN
         else:
-            self.row1.name_label.text, self.row1.flag_img.source = "VND", FLAG_VN
-            self.row2.name_label.text, self.row2.flag_img.source = "KRW", FLAG_KR
+            self.row1.flag_img.source = FLAG_VN
+            self.row2.flag_img.source = FLAG_KR
 
+        # 라벨 이름(VND/KRW) 및 K단위 설정 업데이트 (is_updating=True 상태라 자동계산 스킵됨)
+        is_auto_zeros = self.settings.get("auto_zeros", False)
+        self.row1.set_auto_zero_mode(is_auto_zeros)
+        self.row2.set_auto_zero_mode(is_auto_zeros)
+
+        # 금액 및 한글 단위 텍스트 단순 교체
         self.row1.input.text, self.row2.input.text = v2, v1
         self.row1.unit_label.text, self.row2.unit_label.text = u2, u1
-        self.is_updating = False
-        self.update_ui_for_settings()
+        
+        self.is_updating = False  # 락 해제
 
     def on_start(self):
         if self.settings.get("auto_update", True):
