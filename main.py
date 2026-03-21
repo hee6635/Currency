@@ -312,7 +312,8 @@ class CommaTextInput(TextInput):
                 actual = int(float(raw)) * 1000 if self.k_mode else int(float(raw))
                 unit_str = to_korean_unit(actual)
                 if unit_str:
-                    is_vnd = FLAG_VN in self.parent.parent.flag_img.source if hasattr(self.parent.parent, 'flag_img') else True
+                    is_vnd = FLAG_VN in self.parent.parent.parent.flag_img.source if hasattr(self.parent.parent.parent, 'flag_img') else True
+
                     self.unit_label.text = f"{unit_str}동" if is_vnd else f"{unit_str}원"
                 else:
                     self.unit_label.text = ""
