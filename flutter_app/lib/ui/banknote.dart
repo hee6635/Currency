@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-/// 실제 베트남 폴리머 지폐 사진 (뒷면). assets/notes/<금액>.jpg
+/// 실제 베트남 지폐 사진. assets/notes/<금액>_f.jpg(앞면), _b.jpg(뒷면)
 class Banknote extends StatelessWidget {
-  const Banknote({super.key, required this.value, this.width = 96});
+  const Banknote({super.key, required this.value, this.width = 96, this.back = false});
 
   final int value;
   final double width;
+  final bool back;
 
-  static const aspect = 2.15;
+  static const aspect = 2.33;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +30,7 @@ class Banknote extends StatelessWidget {
       child: ClipRRect(
         borderRadius: radius,
         child: Image.asset(
-          'assets/notes/$value.jpg',
+          'assets/notes/${value}_${back ? 'b' : 'f'}.jpg',
           fit: BoxFit.cover,
           filterQuality: FilterQuality.medium,
         ),

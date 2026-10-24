@@ -147,6 +147,9 @@ const _notes = [
   _Note(50000),
   _Note(20000, '50만동과 비슷해요'),
   _Note(10000),
+  _Note(5000, '종이돈'),
+  _Note(2000, '종이돈'),
+  _Note(1000, '종이돈'),
 ];
 
 class NotesPage extends StatelessWidget {
@@ -237,15 +240,8 @@ class _NoteTile extends StatelessWidget {
             child: GestureDetector(
               onTap: () => showDialog<void>(
                 context: context,
-                builder: (_) => GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Center(
-                    child: Banknote(
-                      value: note.value,
-                      width: MediaQuery.sizeOf(context).width - 40,
-                    ),
-                  ),
-                ),
+                barrierColor: Colors.black.withValues(alpha: 0.85),
+                builder: (ctx) => _NoteViewer(note.value),
               ),
               child: Banknote(value: note.value, width: 92),
             ),
@@ -290,6 +286,43 @@ class _NoteTile extends StatelessWidget {
             icon: const Icon(Icons.add_rounded),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 지폐 앞면 + 뒷면 크게 보기
+class _NoteViewer extends StatelessWidget {
+  const _NoteViewer(this.value);
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = (MediaQuery.sizeOf(context).width - 40).clamp(0.0, 420.0);
+    const label = TextStyle(color: Colors.white70, fontSize: 13);
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${fmt(value)}동',
+              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 16),
+            Banknote(value: value, width: w),
+            const SizedBox(height: 6),
+            const Text('앞면', style: label),
+            const SizedBox(height: 14),
+            Banknote(value: value, width: w, back: true),
+            const SizedBox(height: 6),
+            const Text('뒷면', style: label),
+            const SizedBox(height: 20),
+            const Text('누르면 닫혀요', style: label),
+          ],
+        ),
       ),
     );
   }
