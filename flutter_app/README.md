@@ -33,4 +33,4 @@ lib/
 
 ## 그림 출처
 - 보여주기 카드 그림: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT, `assets/phrases/LICENSE-fluentui-emoji.txt`)
-- 지폐 그림: 실물 사진이 아니라 코드로 직접 그린 그림 (`lib/ui/banknote.dart`)
+- 지폐 사진: 저장소 주인이 제공한 베트남 지폐 이미지의 뒷면을 잘라 사용 (`assets/notes/`)

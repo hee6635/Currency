@@ -135,19 +135,18 @@ class _TableRow extends StatelessWidget {
 // ───────────────────────── 지폐 세기 ─────────────────────────
 
 class _Note {
-  const _Note(this.value, this.short, this.hint, this.color);
+  const _Note(this.value, [this.hint = '']);
   final int value;
-  final String short, hint;
-  final Color color;
+  final String hint;
 }
 
 const _notes = [
-  _Note(500000, '500K', '2만동과 비슷해요', Color(0xFF2B87A8)),
-  _Note(200000, '200K', '', Color(0xFFB0573A)),
-  _Note(100000, '100K', '', Color(0xFF3A845A)),
-  _Note(50000, '50K', '', Color(0xFF9E4878)),
-  _Note(20000, '20K', '50만동과 비슷해요', Color(0xFF2E5AA3)),
-  _Note(10000, '10K', '', Color(0xFF8C6A1E)),
+  _Note(500000, '2만동과 비슷해요'),
+  _Note(200000),
+  _Note(100000),
+  _Note(50000),
+  _Note(20000, '50만동과 비슷해요'),
+  _Note(10000),
 ];
 
 class NotesPage extends StatelessWidget {
@@ -243,13 +242,12 @@ class _NoteTile extends StatelessWidget {
                   child: Center(
                     child: Banknote(
                       value: note.value,
-                      color: note.color,
                       width: MediaQuery.sizeOf(context).width - 40,
                     ),
                   ),
                 ),
               ),
-              child: Banknote(value: note.value, color: note.color, width: 92),
+              child: Banknote(value: note.value, width: 92),
             ),
           ),
           const SizedBox(width: 12),
