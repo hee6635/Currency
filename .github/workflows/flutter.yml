@@ -1,0 +1,54 @@
+name: Flutter APK
+
+on:
+  push:
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter.yml"
+  pull_request:
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 검사 + APK 빌드
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+          cache: true
+
+      - name: 패키지 설치
+        run: flutter pub get
+
+      - name: 코드 검사
+        run: flutter analyze
+
+      - name: 테스트
+        run: flutter test
+
+      - name: APK 빌드
+        run: flutter build apk --release
+
+      - name: APK 올리기
+        uses: actions/upload-artifact@v4
+        with:
+          name: vn-currency-flutter-apk-${{ github.run_number }}
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
