@@ -297,7 +297,7 @@ class _SwapButton extends StatelessWidget {
   }
 }
 
-enum _KeyKind { num, small, op, k, eq, clear, back }
+enum _KeyKind { num, small, op, eq, clear, back }
 
 class Keypad extends StatelessWidget {
   const Keypad({super.key});
@@ -306,14 +306,13 @@ class Keypad extends StatelessWidget {
     ['7', '8', '9', opDiv],
     ['4', '5', '6', opMul],
     ['1', '2', '3', opSub],
-    ['K', '0', '000', opAdd],
-    ['C', '00', 'back', '='],
+    ['00', '0', '000', opAdd],
+    ['C', 'back', '='], // = 은 두 칸
   ];
 
   static _KeyKind _kind(String k) {
     if (operators.contains(k)) return _KeyKind.op;
     return switch (k) {
-      'K' => _KeyKind.k,
       '=' => _KeyKind.eq,
       'C' => _KeyKind.clear,
       'back' => _KeyKind.back,
@@ -324,22 +323,31 @@ class Keypad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (final (i, row) in _rows.indexed) ...[
-          if (i > 0) const SizedBox(height: 8),
-          Expanded(
-            child: Row(
-              children: [
-                for (final (j, k) in row.indexed) ...[
-                  if (j > 0) const SizedBox(width: 8),
-                  Expanded(child: _Key(k, _kind(k))),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ],
+    const gap = 8.0;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final cell = (box.maxWidth - gap * 3) / 4;
+        return Column(
+          children: [
+            for (final (i, row) in _rows.indexed) ...[
+              if (i > 0) const SizedBox(height: gap),
+              Expanded(
+                child: Row(
+                  children: [
+                    for (final (j, k) in row.indexed) ...[
+                      if (j > 0) const SizedBox(width: gap),
+                      SizedBox(
+                        width: row.length == 3 && k == '=' ? cell * 2 + gap : cell,
+                        child: _Key(k, _kind(k)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -350,7 +358,6 @@ class _Key extends StatelessWidget {
   final _KeyKind kind;
 
   static const _names = {
-    'K': '천 단위, 000 붙이기',
     'C': '모두 지우기',
     'back': '한 글자 지우기',
     '=': '계산하기',
@@ -365,14 +372,13 @@ class _Key extends StatelessWidget {
     final p = context.palette;
     final (Color bg, Color fg) = switch (kind) {
       _KeyKind.op => (p.opBg, p.opFg),
-      _KeyKind.k => (p.kBg, p.kFg),
       _KeyKind.eq => (p.navy, p.onNavy),
       _KeyKind.clear => (p.surface, p.danger),
       _ => (p.surface, p.ink),
     };
     final double size = switch (kind) {
       _KeyKind.small => 21,
-      _KeyKind.k || _KeyKind.clear => 22,
+      _KeyKind.clear => 22,
       _KeyKind.op || _KeyKind.eq => 28,
       _ => 26,
     };
@@ -382,7 +388,7 @@ class _Key extends StatelessWidget {
             k,
             style: TextStyle(
               fontSize: size,
-              fontWeight: kind == _KeyKind.k || kind == _KeyKind.clear
+              fontWeight: kind == _KeyKind.clear
                   ? FontWeight.w800
                   : FontWeight.w500,
               color: fg,

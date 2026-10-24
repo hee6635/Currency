@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/money.dart';
+import 'banknote.dart';
 import 'common.dart';
 import 'theme.dart';
 
@@ -141,12 +142,12 @@ class _Note {
 }
 
 const _notes = [
-  _Note(500000, '500K', '하늘색 · 2만동과 헷갈려요', Color(0xFF2B87A8)),
-  _Note(200000, '200K', '주황빛 갈색', Color(0xFFB0573A)),
-  _Note(100000, '100K', '초록색', Color(0xFF3A845A)),
-  _Note(50000, '50K', '분홍 보라', Color(0xFF9E4878)),
-  _Note(20000, '20K', '파란색 · 50만동과 헷갈려요', Color(0xFF2E5AA3)),
-  _Note(10000, '10K', '황토색', Color(0xFF8C6A1E)),
+  _Note(500000, '500K', '2만동과 비슷해요', Color(0xFF2B87A8)),
+  _Note(200000, '200K', '', Color(0xFFB0573A)),
+  _Note(100000, '100K', '', Color(0xFF3A845A)),
+  _Note(50000, '50K', '', Color(0xFF9E4878)),
+  _Note(20000, '20K', '50만동과 비슷해요', Color(0xFF2E5AA3)),
+  _Note(10000, '10K', '', Color(0xFF8C6A1E)),
 ];
 
 class NotesPage extends StatelessWidget {
@@ -231,20 +232,24 @@ class _NoteTile extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
       child: Row(
         children: [
-          Container(
-            width: 64,
-            height: 40,
-            decoration: BoxDecoration(
-              color: note.color,
-              borderRadius: BorderRadius.circular(8),
-              gradient: LinearGradient(
-                colors: [note.color, Color.lerp(note.color, Colors.white, 0.25)!],
+          Semantics(
+            button: true,
+            label: '${fmt(note.value)}동 지폐 크게 보기',
+            child: GestureDetector(
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) => GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Center(
+                    child: Banknote(
+                      value: note.value,
+                      color: note.color,
+                      width: MediaQuery.sizeOf(context).width - 40,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              note.short,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+              child: Banknote(value: note.value, color: note.color, width: 92),
             ),
           ),
           const SizedBox(width: 12),
@@ -256,7 +261,12 @@ class _NoteTile extends StatelessWidget {
                   '${fmt(note.value)}동',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.ink, fontFeatures: tabular),
                 ),
-                Text(note.hint, style: TextStyle(fontSize: 12, color: p.muted)),
+                if (note.hint.isNotEmpty)
+                  Text(
+                    note.hint,
+                    maxLines: 2,
+                    style: TextStyle(fontSize: 12, color: p.muted, height: 1.3),
+                  ),
               ],
             ),
           ),
@@ -290,21 +300,70 @@ class _NoteTile extends StatelessWidget {
 // ───────────────────────── 보여주기 카드 ─────────────────────────
 
 class Phrase {
-  const Phrase(this.ko, this.vi, {this.image});
+  const Phrase(this.ko, this.vi, this.icon, {this.no = false, this.sign});
   final String ko, vi;
-  final String? image;
+
+  /// 3D 그림 (Microsoft Fluent Emoji, MIT)
+  final String icon;
+
+  /// 그림 위에 빨간 금지 표시
+  final bool no;
+
+  /// 전체 화면에 그림 대신 보여줄 안내판 이미지
+  final String? sign;
 }
 
 const phrases = [
-  Phrase('고수 빼주세요', 'Không cho rau mùi', image: 'assets/herb.png'),
-  Phrase('얼음 빼주세요', 'Không đá'),
-  Phrase('안 맵게 해주세요', 'Không cay'),
-  Phrase('덜 달게 해주세요', 'Ít ngọt'),
-  Phrase('얼마예요?', 'Bao nhiêu tiền?'),
-  Phrase('계산해 주세요', 'Tính tiền'),
-  Phrase('깎아 주실 수 있어요?', 'Bớt được không?'),
-  Phrase('화장실 어디예요?', 'Nhà vệ sinh ở đâu?'),
+  Phrase('고수 빼주세요', 'Không cho rau mùi', 'assets/phrases/herb.png', no: true, sign: 'assets/herb.png'),
+  Phrase('얼음 빼주세요', 'Không đá', 'assets/phrases/ice.png', no: true),
+  Phrase('안 맵게 해주세요', 'Không cay', 'assets/phrases/pepper.png', no: true),
+  Phrase('덜 달게 해주세요', 'Ít ngọt', 'assets/phrases/candy.png'),
+  Phrase('얼마예요?', 'Bao nhiêu tiền?', 'assets/phrases/money.png'),
+  Phrase('계산해 주세요', 'Tính tiền', 'assets/phrases/receipt.png'),
+  Phrase('깎아 주실 수 있어요?', 'Bớt được không?', 'assets/phrases/label.png'),
+  Phrase('화장실 어디예요?', 'Nhà vệ sinh ở đâu?', 'assets/phrases/toilet.png'),
 ];
+
+/// 그림 + (필요하면) 빨간 금지 표시
+class PhraseIcon extends StatelessWidget {
+  const PhraseIcon(this.phrase, {super.key, required this.size});
+  final Phrase phrase;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        Padding(
+          padding: EdgeInsets.all(phrase.no ? size * 0.14 : 0),
+          child: Image.asset(phrase.icon, fit: BoxFit.contain),
+        ),
+        if (phrase.no) CustomPaint(painter: _NoSignPainter()),
+      ],
+    ),
+  );
+}
+
+class _NoSignPainter extends CustomPainter {
+  @override
+  void paint(Canvas c, Size s) {
+    final stroke = s.width * 0.085;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = const Color(0xE6D32F2F);
+    final r = s.width / 2 - stroke / 2;
+    final center = Offset(s.width / 2, s.height / 2);
+    c.drawCircle(center, r, paint);
+    final d = r * 0.7071;
+    c.drawLine(center + Offset(-d, -d), center + Offset(d, d), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
 
 class PhrasesPage extends StatelessWidget {
   const PhrasesPage({super.key});
@@ -330,7 +389,7 @@ class PhrasesPage extends StatelessWidget {
               crossAxisCount: 2,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 1.35,
+              childAspectRatio: 1.02,
             ),
             itemCount: phrases.length,
             itemBuilder: (context, i) {
@@ -352,15 +411,28 @@ class PhrasesPage extends StatelessWidget {
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(ph.ko, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.ink)),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Hero(tag: ph.icon, child: PhraseIcon(ph, size: 64)),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          ph.ko,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.ink),
+                        ),
+                        const SizedBox(height: 2),
                         Text(
                           ph.vi,
-                          maxLines: 2,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: accent),
                         ),
                       ],
@@ -383,6 +455,7 @@ class PhraseScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const muted = Color(0xFF5D6577);
     return Scaffold(
       backgroundColor: Colors.white,
       body: GestureDetector(
@@ -394,32 +467,31 @@ class PhraseScreen extends StatelessWidget {
             child: Column(
               children: [
                 Expanded(
-                  child: phrase.image != null
-                      ? Image.asset(phrase.image!, fit: BoxFit.contain)
+                  child: phrase.sign != null
+                      ? Image.asset(phrase.sign!, fit: BoxFit.contain)
                       : Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              Hero(tag: phrase.icon, child: PhraseIcon(phrase, size: 200)),
+                              const SizedBox(height: 36),
                               Text(
                                 phrase.vi,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  fontSize: 56,
+                                  fontSize: 52,
                                   height: 1.15,
                                   fontWeight: FontWeight.w800,
                                   color: Color(0xFF10172A),
                                 ),
                               ),
-                              const SizedBox(height: 20),
-                              Text(
-                                phrase.ko,
-                                style: const TextStyle(fontSize: 20, color: Color(0xFF5D6577)),
-                              ),
+                              const SizedBox(height: 16),
+                              Text(phrase.ko, style: const TextStyle(fontSize: 20, color: muted)),
                             ],
                           ),
                         ),
                 ),
-                const Text('화면을 누르면 닫혀요', style: TextStyle(fontSize: 13, color: Color(0xFF5D6577))),
+                const Text('화면을 누르면 닫혀요', style: TextStyle(fontSize: 13, color: muted)),
               ],
             ),
           ),
