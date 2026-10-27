@@ -156,8 +156,20 @@ class _KrFlag extends CustomPainter {
     c.rotate(math.atan2(2, 3));
     final red = Paint()..color = const Color(0xFFCD2E3A);
     final blue = Paint()..color = const Color(0xFF0047A0);
-    c.drawArc(Rect.fromCircle(center: Offset.zero, radius: t), math.pi, math.pi, true, red);
-    c.drawArc(Rect.fromCircle(center: Offset.zero, radius: t), 0, math.pi, true, blue);
+    c.drawArc(
+      Rect.fromCircle(center: Offset.zero, radius: t),
+      math.pi,
+      math.pi,
+      true,
+      red,
+    );
+    c.drawArc(
+      Rect.fromCircle(center: Offset.zero, radius: t),
+      0,
+      math.pi,
+      true,
+      blue,
+    );
     c.drawCircle(Offset(-t / 2, 0), t / 2, red);
     c.drawCircle(Offset(t / 2, 0), t / 2, blue);
     c.restore();
@@ -184,7 +196,11 @@ class _KrFlag extends CustomPainter {
 
 /// 모서리가 둥근 흰 카드
 class Panel extends StatelessWidget {
-  const Panel({super.key, required this.child, this.padding = const EdgeInsets.all(18)});
+  const Panel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(18),
+  });
   final Widget child;
   final EdgeInsets padding;
 
@@ -202,6 +218,18 @@ class Panel extends StatelessWidget {
     );
   }
 }
+
+/// 통화마다 고유한 색: 동 = 베트남 국기 빨강, 원 = 남색.
+/// 결과 카드가 바꿀 통화의 색을 따라가서 방향이 한눈에 보인다.
+List<Color> currencyGradient(Currency c, Palette p, Brightness b) {
+  if (c == Currency.krw) return [p.navyHi, p.navy];
+  return b == Brightness.light
+      ? const [Color(0xFFD7383F), Color(0xFF961A24)]
+      : const [Color(0xFFB4323A), Color(0xFF6A131B)];
+}
+
+Color currencyAccent(Currency c, Palette p) =>
+    c == Currency.vnd ? const Color(0xFFD32F2F) : p.navyHi;
 
 /// 남색 강조 카드 (결과, 합계)
 BoxDecoration navyCard(Palette p) => BoxDecoration(
@@ -224,6 +252,9 @@ void toast(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(milliseconds: 1400)),
+      SnackBar(
+        content: Text(msg),
+        duration: const Duration(milliseconds: 1400),
+      ),
     );
 }
