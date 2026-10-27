@@ -15,7 +15,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "org.myapp.vn_currency"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -29,11 +28,28 @@ android {
         versionName = flutter.versionName
     }
 
+    // 고정 서명: 열쇠 파일과 비밀번호는 저장소에 두지 않고 GitHub Secret으로만 넣는다.
+    // CI가 ANDROID_KEYSTORE_BASE64 를 upload-keystore.p12 로 풀어 두고
+    // ANDROID_KEYSTORE_PASSWORD 를 넘겨준다. 둘 중 하나라도 없으면 디버그 서명.
+    val keystoreFile = file("upload-keystore.p12")
+    val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        ?.takeIf { it.isNotBlank() && keystoreFile.exists() }
+
+    signingConfigs {
+        if (keystorePassword != null) {
+            create("release") {
+                storeFile = keystoreFile
+                storeType = "PKCS12"
+                storePassword = keystorePassword
+                keyAlias = "upload"
+                keyPassword = keystorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (keystorePassword != null) "release" else "debug")
         }
     }
 }

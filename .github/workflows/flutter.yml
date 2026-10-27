@@ -42,8 +42,30 @@ jobs:
       - name: 테스트
         run: flutter test
 
+      - name: 서명 열쇠 풀기
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android/app/upload-keystore.p12
+          fi
+
       - name: APK 빌드
+        env:
+          # 열쇠나 비밀번호가 없으면 디버그 서명으로 빌드됨 (build.gradle.kts 참고)
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: flutter build apk --release
+
+      - name: 서명 열쇠 지우기
+        if: always()
+        run: rm -f android/app/upload-keystore.p12
+
+      - name: 서명 확인
+        run: |
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "::warning::서명 Secret이 없어 임시(디버그) 서명으로 빌드했어요. 덮어 설치가 안 됩니다."
+          fi
+          keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -E "Owner|SHA256" || true
 
       - name: APK 올리기
         uses: actions/upload-artifact@v4
@@ -51,4 +73,42 @@ jobs:
           name: vn-currency-flutter-apk-${{ github.run_number }}
           path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          retention-days: 14
+
+  launch-check:
+    name: 에뮬레이터 실행 점검
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vn-currency-flutter-apk-${{ github.run_number }}
+          path: apk
+
+      - name: KVM 사용 허용
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 앱 설치 후 실행해 보기
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash flutter_app/tool/launch_check.sh apk/app-release.apk
+
+      - name: 점검 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-check-${{ github.run_number }}
+          path: launch-check/
+          if-no-files-found: ignore
           retention-days: 14
