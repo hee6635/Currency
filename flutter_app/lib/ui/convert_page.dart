@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../core/money.dart';
 import 'common.dart';
+import 'motion.dart';
 import 'rate_sheet.dart';
 import 'theme.dart';
 
@@ -123,11 +124,12 @@ class _InputCard extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
+                  child: AnimatedNumberText(
                     prettyExpr(s.expr),
+                    cursorColor: p.gold,
                     style: TextStyle(
                       fontSize: 34,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: -0.8,
                       color: s.expr.isEmpty ? p.muted.withValues(alpha: 0.6) : p.ink,
                       fontFeatures: tabular,
@@ -221,14 +223,32 @@ class _ResultCard extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(
-                        big,
-                        style: TextStyle(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1.2,
-                          color: s.expr.isEmpty ? p.onNavyMuted.withValues(alpha: 0.7) : p.onNavy,
-                          fontFeatures: tabular,
+                      // 결과가 바뀔 때 살짝 올라오며 바뀐다
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeIn,
+                        layoutBuilder: (current, previous) => Stack(
+                          alignment: Alignment.centerRight,
+                          children: [...previous, ?current],
+                        ),
+                        transitionBuilder: (child, a) => FadeTransition(
+                          opacity: a,
+                          child: SlideTransition(
+                            position: Tween(begin: const Offset(0, 0.25), end: Offset.zero).animate(a),
+                            child: child,
+                          ),
+                        ),
+                        child: Text(
+                          big,
+                          key: ValueKey(big),
+                          style: TextStyle(
+                            fontSize: 42,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1.2,
+                            color: s.expr.isEmpty ? p.onNavyMuted.withValues(alpha: 0.7) : p.onNavy,
+                            fontFeatures: tabular,
+                          ),
                         ),
                       ),
                     ),
@@ -389,30 +409,33 @@ class _Key extends StatelessWidget {
             style: TextStyle(
               fontSize: size,
               fontWeight: kind == _KeyKind.clear
-                  ? FontWeight.w800
-                  : FontWeight.w500,
+                  ? FontWeight.w700
+                  : FontWeight.w400,
               color: fg,
               fontFeatures: tabular,
             ),
           );
 
     final s = AppScope.read(context);
+    final highlight = switch (kind) {
+      _KeyKind.op => p.navyHi,
+      _KeyKind.clear => p.danger,
+      _ => p.gold,
+    };
     return Semantics(
       button: true,
       label: _names[k] ?? k,
       excludeSemantics: true,
-      child: Material(
+      child: PressableKey(
         color: bg,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () {
-            HapticFeedback.selectionClick();
-            s.press(k);
-          },
-          onLongPress: kind == _KeyKind.back ? () => s.press('C') : null,
-          child: Center(child: child),
-        ),
+        highlight: highlight,
+        shadow: kind != _KeyKind.op,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          s.press(k);
+        },
+        onLongPress: kind == _KeyKind.back ? () => s.press('C') : null,
+        child: child,
       ),
     );
   }

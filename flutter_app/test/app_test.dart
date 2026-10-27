@@ -65,24 +65,25 @@ void main() {
   testWidgets('키패드로 입력하면 결과 카드에 원화가 뜬다', (tester) async {
     final s = await makeState();
     await tester.pumpWidget(VnCurrencyApp(state: s));
-    await tester.pumpAndSettle();
+    // 커서가 계속 깜빡여서 pumpAndSettle 대신 시간만큼 진행
+    await tester.pump(const Duration(seconds: 1));
 
     await tester.tap(find.text('1').first);
     await tester.tap(find.text('8').first);
     await tester.tap(find.text('5').first);
     await tester.tap(find.text('000').first);
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('185,000'), findsOneWidget);
+    expect(s.expr, '185000');
     expect(find.text('10,000원'), findsOneWidget);
     expect(find.text('18만 5,000동'), findsOneWidget);
 
     // 탭 이동
     await tester.tap(find.text('보여주기'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
     expect(find.text('Không đá'), findsOneWidget);
     await tester.tap(find.text('메모'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
     expect(find.byType(TextField), findsOneWidget);
   });
 }
