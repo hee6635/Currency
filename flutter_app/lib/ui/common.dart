@@ -112,16 +112,32 @@ class FlagIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: Size.square(size),
-    painter: currency == Currency.vnd ? _VnFlag() : _KrFlag(),
+    painter: currency == Currency.vnd ? _VnFlag(true) : _KrFlag(true),
+  );
+}
+
+/// 주어진 칸을 꽉 채우는 국기 (원이든 알약 모양이든, 모양은 바깥에서 잘라 쓴다)
+class FlagFill extends StatelessWidget {
+  const FlagFill(this.currency, {super.key});
+  final Currency currency;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    painter: currency == Currency.vnd ? _VnFlag(false) : _KrFlag(false),
+    child: const SizedBox.expand(),
   );
 }
 
 class _VnFlag extends CustomPainter {
+  _VnFlag(this.round);
+  final bool round;
+
   @override
   void paint(Canvas c, Size s) {
-    final r = s.width / 2;
-    final center = Offset(r, r);
-    c.drawCircle(center, r, Paint()..color = const Color(0xFFDA251D));
+    final r = math.min(s.width, s.height) / 2;
+    final center = s.center(Offset.zero);
+    final bg = Paint()..color = const Color(0xFFDA251D);
+    round ? c.drawCircle(center, r, bg) : c.drawRect(Offset.zero & s, bg);
     final path = Path();
     for (var i = 0; i < 10; i++) {
       final rad = i.isEven ? r * 0.58 : r * 0.23;
@@ -133,54 +149,53 @@ class _VnFlag extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(_VnFlag old) => old.round != round;
 }
 
 class _KrFlag extends CustomPainter {
+  _KrFlag(this.round);
+  final bool round;
+
   @override
   void paint(Canvas c, Size s) {
-    final r = s.width / 2;
-    final center = Offset(r, r);
-    c.drawCircle(center, r, Paint()..color = Colors.white);
-    c.drawCircle(
-      center,
-      r - 0.5,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..color = const Color(0x22000000),
-    );
+    final r = math.min(s.width, s.height) / 2;
+    final center = s.center(Offset.zero);
+    final bg = Paint()..color = Colors.white;
+    if (round) {
+      c.drawCircle(center, r, bg);
+      c.drawCircle(
+        center,
+        r - 0.5,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..color = const Color(0x22000000),
+      );
+    } else {
+      c.drawRect(Offset.zero & s, bg);
+    }
     // 태극
     final t = r * 0.42;
     c.save();
-    c.translate(r, r);
+    c.translate(center.dx, center.dy);
     c.rotate(math.atan2(2, 3));
     final red = Paint()..color = const Color(0xFFCD2E3A);
     final blue = Paint()..color = const Color(0xFF0047A0);
-    c.drawArc(
-      Rect.fromCircle(center: Offset.zero, radius: t),
-      math.pi,
-      math.pi,
-      true,
-      red,
-    );
-    c.drawArc(
-      Rect.fromCircle(center: Offset.zero, radius: t),
-      0,
-      math.pi,
-      true,
-      blue,
-    );
+    final disc = Rect.fromCircle(center: Offset.zero, radius: t);
+    c.drawArc(disc, math.pi, math.pi, true, red);
+    c.drawArc(disc, 0, math.pi, true, blue);
     c.drawCircle(Offset(-t / 2, 0), t / 2, red);
     c.drawCircle(Offset(t / 2, 0), t / 2, blue);
     c.restore();
-    // 4괘 (단순화)
+    // 4괘 (단순화). 가로로 긴 칸에서는 실제 국기처럼 네 귀퉁이 쪽으로 벌린다.
     final bar = Paint()
       ..color = const Color(0xFF111111)
       ..strokeWidth = r * 0.07;
+    final rx = r * 0.72 * (s.width / s.height).clamp(1.0, 1.7);
+    final ry = r * 0.72;
     for (var k = 0; k < 4; k++) {
       final a = -math.pi * 3 / 4 + k * math.pi / 2;
       c.save();
-      c.translate(r + math.cos(a) * r * 0.72, r + math.sin(a) * r * 0.72);
+      c.translate(center.dx + math.cos(a) * rx, center.dy + math.sin(a) * ry);
       c.rotate(a + math.pi / 2);
       for (var j = -1; j <= 1; j++) {
         final y = j * r * 0.11;
@@ -191,7 +206,7 @@ class _KrFlag extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(_KrFlag old) => old.round != round;
 }
 
 /// 모서리가 둥근 흰 카드

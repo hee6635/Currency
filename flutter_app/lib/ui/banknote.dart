@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 /// 실제 베트남 지폐 사진. assets/notes/<금액>_f.jpg(앞면), _b.jpg(뒷면)
 class Banknote extends StatelessWidget {
-  const Banknote({super.key, required this.value, this.width = 96, this.back = false});
+  const Banknote({
+    super.key,
+    required this.value,
+    this.width = 96,
+    this.back = false,
+  });
 
   final int value;
   final double width;

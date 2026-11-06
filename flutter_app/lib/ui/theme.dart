@@ -97,19 +97,17 @@ class Palette extends ThemeExtension<Palette> {
 
 ThemeData buildTheme(Brightness b) {
   final p = b == Brightness.light ? Palette.light : Palette.dark;
-  final scheme = ColorScheme.fromSeed(
-    seedColor: p.navy,
-    brightness: b,
-  ).copyWith(
-    primary: b == Brightness.light ? p.navy : p.navyHi,
-    onPrimary: Colors.white,
-    surface: p.bg,
-    onSurface: p.ink,
-    surfaceContainerLow: p.surface,
-    surfaceContainerHighest: p.surface,
-    secondary: p.gold,
-    error: p.danger,
-  );
+  final scheme = ColorScheme.fromSeed(seedColor: p.navy, brightness: b)
+      .copyWith(
+        primary: b == Brightness.light ? p.navy : p.navyHi,
+        onPrimary: Colors.white,
+        surface: p.bg,
+        onSurface: p.ink,
+        surfaceContainerLow: p.surface,
+        surfaceContainerHighest: p.surface,
+        secondary: p.gold,
+        error: p.danger,
+      );
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,

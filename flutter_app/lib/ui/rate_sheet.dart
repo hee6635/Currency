@@ -10,10 +10,8 @@ void showRateSheet(BuildContext context) {
     isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: context.palette.surface,
-    builder: (_) => AppScope(
-      state: AppScope.read(context),
-      child: const _RateSheet(),
-    ),
+    builder: (_) =>
+        AppScope(state: AppScope.read(context), child: const _RateSheet()),
   );
 }
 
@@ -89,7 +87,11 @@ class _RateSheetState extends State<_RateSheet> {
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
                   '1만동 ≈ ${fmt(10000 / s.rate!)}원  ·  1,000원 ≈ ${fmt(1000 * s.rate!)}동',
-                  style: TextStyle(fontSize: 14, color: p.ink, fontFeatures: tabular),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: p.ink,
+                    fontFeatures: tabular,
+                  ),
                 ),
               ),
             const SizedBox(height: 6),
@@ -117,7 +119,9 @@ class _RateSheetState extends State<_RateSheet> {
                     : const Icon(Icons.refresh_rounded),
                 label: Text(s.fetching ? '불러오는 중' : '최신 환율 가져오기'),
                 style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
@@ -126,7 +130,11 @@ class _RateSheetState extends State<_RateSheet> {
             const SizedBox(height: 18),
             Text(
               '직접 입력',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.ink),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: p.ink,
+              ),
             ),
             const SizedBox(height: 4),
             Text('환전소 환율을 그대로 쓰고 싶을 때 (1원당 동)', style: muted),
@@ -137,7 +145,9 @@ class _RateSheetState extends State<_RateSheet> {
                 Expanded(
                   child: TextField(
                     controller: _ctrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _apply(s),
                     decoration: InputDecoration(
@@ -158,7 +168,9 @@ class _RateSheetState extends State<_RateSheet> {
                   child: FilledButton.tonal(
                     onPressed: () => _apply(s),
                     style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     child: const Text('적용'),
                   ),
@@ -178,12 +190,21 @@ class _RateSheetState extends State<_RateSheet> {
                 Expanded(
                   child: Text(
                     '환전 수수료 반영',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: p.ink),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: p.ink,
+                    ),
                   ),
                 ),
                 Text(
-                  s.feePercent == 0 ? '끔' : '${s.feePercent.toStringAsFixed(1)}%',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: p.goldText),
+                  s.feePercent == 0
+                      ? '끔'
+                      : '${s.feePercent.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: p.goldText,
+                  ),
                 ),
               ],
             ),

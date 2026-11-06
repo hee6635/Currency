@@ -54,7 +54,9 @@ class AppState extends ChangeNotifier {
     memo = p.getString('memo') ?? defaultMemo;
     try {
       final raw = jsonDecode(p.getString('notes') ?? '{}') as Map;
-      noteCounts = raw.map((k, v) => MapEntry(int.parse(k as String), v as int));
+      noteCounts = raw.map(
+        (k, v) => MapEntry(int.parse(k as String), v as int),
+      );
     } catch (_) {
       noteCounts = {};
     }
@@ -65,7 +67,8 @@ class AppState extends ChangeNotifier {
   Future<void>? _inflight;
 
   /// 이미 불러오는 중이면 같은 작업을 기다린다 (중복 요청 방지)
-  Future<void> refresh() => _inflight ??= _fetch().whenComplete(() => _inflight = null);
+  Future<void> refresh() =>
+      _inflight ??= _fetch().whenComplete(() => _inflight = null);
 
   Future<void> _fetch() async {
     fetching = true;

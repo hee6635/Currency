@@ -11,7 +11,16 @@ import 'theme.dart';
 class TablePage extends StatelessWidget {
   const TablePage({super.key});
 
-  static const _vnd = [10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000];
+  static const _vnd = [
+    10000,
+    20000,
+    50000,
+    100000,
+    200000,
+    500000,
+    1000000,
+    2000000,
+  ];
   static const _krw = [1000, 5000, 10000, 30000, 50000, 100000, 300000, 500000];
 
   @override
@@ -47,21 +56,33 @@ class TablePage extends StatelessWidget {
         ),
         Expanded(
           child: s.rate == null
-              ? Center(child: Text('환율이 있어야 표를 만들 수 있어요', style: TextStyle(color: p.muted)))
+              ? Center(
+                  child: Text(
+                    '환율이 있어야 표를 만들 수 있어요',
+                    style: TextStyle(color: p.muted),
+                  ),
+                )
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   children: [
                     Panel(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 4,
+                      ),
                       child: Column(
                         children: [
                           for (final (i, a) in amounts.indexed) ...[
                             if (i > 0) Divider(height: 1, color: p.line),
                             _TableRow(
                               left: '${fmt(a)}${src.unit}',
-                              leftSub: koreanUnit(a).isEmpty ? '' : '${koreanUnit(a)}${src.unit}',
+                              leftSub: koreanUnit(a).isEmpty
+                                  ? ''
+                                  : '${koreanUnit(a)}${src.unit}',
                               right: '${fmt(conv(a))}${dst.unit}',
-                              rightSub: koreanUnit(conv(a)).isEmpty ? '' : '${koreanUnit(conv(a))}${dst.unit}',
+                              rightSub: koreanUnit(conv(a)).isEmpty
+                                  ? ''
+                                  : '${koreanUnit(conv(a))}${dst.unit}',
                             ),
                           ],
                         ],
@@ -74,14 +95,19 @@ class TablePage extends StatelessWidget {
                         icon: const Icon(Icons.copy_rounded, size: 18),
                         label: const Text('표 복사하기'),
                         style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                         onPressed: () {
                           final lines = [
                             '[1원 = ${s.rate!.toStringAsFixed(2)}동 기준]',
-                            for (final a in amounts) '${fmt(a)}${src.unit} = ${fmt(conv(a))}${dst.unit}',
+                            for (final a in amounts)
+                              '${fmt(a)}${src.unit} = ${fmt(conv(a))}${dst.unit}',
                           ];
-                          Clipboard.setData(ClipboardData(text: lines.join('\n')));
+                          Clipboard.setData(
+                            ClipboardData(text: lines.join('\n')),
+                          );
                           toast(context, '환산표를 복사했어요');
                         },
                       ),
@@ -95,14 +121,28 @@ class TablePage extends StatelessWidget {
 }
 
 class _TableRow extends StatelessWidget {
-  const _TableRow({required this.left, required this.leftSub, required this.right, required this.rightSub});
+  const _TableRow({
+    required this.left,
+    required this.leftSub,
+    required this.right,
+    required this.rightSub,
+  });
   final String left, leftSub, right, rightSub;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    TextStyle big(Color c) => TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c, fontFeatures: tabular);
-    final small = TextStyle(fontSize: 12, color: p.muted, fontFeatures: tabular);
+    TextStyle big(Color c) => TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      color: c,
+      fontFeatures: tabular,
+    );
+    final small = TextStyle(
+      fontSize: 12,
+      color: p.muted,
+      fontFeatures: tabular,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
@@ -121,7 +161,14 @@ class _TableRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(right, style: big(Theme.of(context).brightness == Brightness.light ? p.navyHi : p.gold)),
+                Text(
+                  right,
+                  style: big(
+                    Theme.of(context).brightness == Brightness.light
+                        ? p.navyHi
+                        : p.gold,
+                  ),
+                ),
                 if (rightSub.isNotEmpty) Text(rightSub, style: small),
               ],
             ),
@@ -177,7 +224,13 @@ class NotesPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('지갑 속 합계', style: TextStyle(fontSize: 13, color: p.onNavyMuted)),
+                          Text(
+                            '지갑 속 합계',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: p.onNavyMuted,
+                            ),
+                          ),
                           const SizedBox(height: 2),
                           FittedBox(
                             fit: BoxFit.scaleDown,
@@ -194,15 +247,24 @@ class NotesPage extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            s.rate == null ? '환율 없음' : '≈ ${fmt(total / s.rate!)}원',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.gold, fontFeatures: tabular),
+                            s.rate == null
+                                ? '환율 없음'
+                                : '≈ ${fmt(total / s.rate!)}원',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: p.gold,
+                              fontFeatures: tabular,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     TextButton(
                       onPressed: total == 0 ? null : s.resetNotes,
-                      style: TextButton.styleFrom(foregroundColor: p.onNavyMuted),
+                      style: TextButton.styleFrom(
+                        foregroundColor: p.onNavyMuted,
+                      ),
                       child: const Text('비우기'),
                     ),
                   ],
@@ -253,7 +315,12 @@ class _NoteTile extends StatelessWidget {
               children: [
                 Text(
                   '${fmt(note.value)}동',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.ink, fontFeatures: tabular),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: p.ink,
+                    fontFeatures: tabular,
+                  ),
                 ),
                 if (note.hint.isNotEmpty)
                   Text(
@@ -274,7 +341,12 @@ class _NoteTile extends StatelessWidget {
             child: Text(
               '$count',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.ink, fontFeatures: tabular),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+                fontFeatures: tabular,
+              ),
             ),
           ),
           IconButton.filled(
@@ -309,7 +381,11 @@ class _NoteViewer extends StatelessWidget {
           children: [
             Text(
               '${fmt(value)}동',
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 16),
             Banknote(value: value, width: w),
@@ -345,7 +421,13 @@ class Phrase {
 }
 
 const phrases = [
-  Phrase('고수 빼주세요', 'Không cho rau mùi', 'assets/phrases/herb.png', no: true, sign: 'assets/herb.png'),
+  Phrase(
+    '고수 빼주세요',
+    'Không cho rau mùi',
+    'assets/phrases/herb.png',
+    no: true,
+    sign: 'assets/herb.png',
+  ),
   Phrase('얼음 빼주세요', 'Không đá', 'assets/phrases/ice.png', no: true),
   Phrase('안 맵게 해주세요', 'Không cay', 'assets/phrases/pepper.png', no: true),
   Phrase('덜 달게 해주세요', 'Ít ngọt', 'assets/phrases/candy.png'),
@@ -402,7 +484,9 @@ class PhrasesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final accent = Theme.of(context).brightness == Brightness.light ? p.navyHi : p.gold;
+    final accent = Theme.of(context).brightness == Brightness.light
+        ? p.navyHi
+        : p.gold;
     return Column(
       children: [
         const PageHeader(title: '보여주기'),
@@ -410,7 +494,10 @@ class PhrasesPage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text('누르면 크게 떠요. 직원에게 화면을 보여주세요.', style: TextStyle(fontSize: 13, color: p.muted)),
+            child: Text(
+              '누르면 크게 떠요. 직원에게 화면을 보여주세요.',
+              style: TextStyle(fontSize: 13, color: p.muted),
+            ),
           ),
         ),
         Expanded(
@@ -432,13 +519,16 @@ class PhrasesPage extends StatelessWidget {
                   side: BorderSide(color: p.line),
                 ),
                 child: InkWell(
-                  customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                  customBorder: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
                   onTap: () => Navigator.of(context).push(
                     PageRouteBuilder<void>(
                       opaque: true,
                       transitionDuration: const Duration(milliseconds: 220),
                       pageBuilder: (_, _, _) => PhraseScreen(ph),
-                      transitionsBuilder: (_, a, _, child) => FadeTransition(opacity: a, child: child),
+                      transitionsBuilder: (_, a, _, child) =>
+                          FadeTransition(opacity: a, child: child),
                     ),
                   ),
                   child: Padding(
@@ -449,7 +539,10 @@ class PhrasesPage extends StatelessWidget {
                         Expanded(
                           child: Align(
                             alignment: Alignment.centerLeft,
-                            child: Hero(tag: ph.icon, child: PhraseIcon(ph, size: 64)),
+                            child: Hero(
+                              tag: ph.icon,
+                              child: PhraseIcon(ph, size: 64),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -457,14 +550,22 @@ class PhrasesPage extends StatelessWidget {
                           ph.ko,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.ink),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: p.ink,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           ph.vi,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: accent),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: accent,
+                          ),
                         ),
                       ],
                     ),
@@ -504,7 +605,10 @@ class PhraseScreen extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Hero(tag: phrase.icon, child: PhraseIcon(phrase, size: 200)),
+                              Hero(
+                                tag: phrase.icon,
+                                child: PhraseIcon(phrase, size: 200),
+                              ),
                               const SizedBox(height: 36),
                               Text(
                                 phrase.vi,
@@ -517,12 +621,21 @@ class PhraseScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              Text(phrase.ko, style: const TextStyle(fontSize: 20, color: muted)),
+                              Text(
+                                phrase.ko,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  color: muted,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                 ),
-                const Text('화면을 누르면 닫혀요', style: TextStyle(fontSize: 13, color: muted)),
+                const Text(
+                  '화면을 누르면 닫혀요',
+                  style: TextStyle(fontSize: 13, color: muted),
+                ),
               ],
             ),
           ),
@@ -586,7 +699,10 @@ class _MemoPageState extends State<MemoPage> {
         ),
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Text('입력하면 자동으로 저장돼요', style: TextStyle(fontSize: 12, color: p.muted)),
+          child: Text(
+            '입력하면 자동으로 저장돼요',
+            style: TextStyle(fontSize: 12, color: p.muted),
+          ),
         ),
       ],
     );

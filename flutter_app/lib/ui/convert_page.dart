@@ -624,10 +624,10 @@ class _Key extends StatelessWidget {
 class _FlagSwapKey extends StatelessWidget {
   const _FlagSwapKey();
 
-  /// 시안 비교용: pair(국기 두 개) / badge(국기 하나 + 바꾸기 표시) / text("동→원")
+  /// inset(테두리 안쪽 국기, 기본) / fill(꽉 찬 국기) / pair / badge / text("동→원")
   static const style = String.fromEnvironment(
     'FLAG_STYLE',
-    defaultValue: 'text',
+    defaultValue: 'inset',
   );
 
   @override
@@ -646,6 +646,12 @@ class _FlagSwapKey extends StatelessWidget {
           s.swap();
         },
         child: switch (style) {
+          'fill' => _fill(s.from),
+          'inset' => Padding(
+            // 버튼 테두리를 남기고 안쪽에만 국기
+            padding: const EdgeInsets.all(7),
+            child: _fill(s.from),
+          ),
           'pair' => _pair(s.from),
           'badge' => _badge(s.from, p),
           _ => _text(s.from, p),
@@ -655,6 +661,45 @@ class _FlagSwapKey extends StatelessWidget {
   }
 
   static const _dur = Duration(milliseconds: 320);
+
+  // 버튼을 꽉 채운 국기. 누르면 지금 국기는 안쪽으로 물러나며 작아지고,
+  // 다른 국기가 위에서 미끄러져 내려와 버튼을 채운다.
+  Widget _fill(Currency from) => ClipRRect(
+    borderRadius: BorderRadius.circular(999),
+    child: AnimatedSwitcher(
+      duration: const Duration(milliseconds: 460),
+      reverseDuration: const Duration(milliseconds: 460),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (current, previous) =>
+          Stack(fit: StackFit.expand, children: [...previous, ?current]),
+      transitionBuilder: (child, a) {
+        if (child.key == ValueKey(from)) {
+          // 들어오는 국기: 위에서 아래로
+          return SlideTransition(
+            position: Tween(
+              begin: const Offset(0, -1),
+              end: Offset.zero,
+            ).animate(a),
+            child: child,
+          );
+        }
+        // 나가는 국기: 뒤로 물러나듯 작아지고 어두워짐
+        return ScaleTransition(
+          scale: Tween(begin: 0.6, end: 1.0).animate(a),
+          child: FadeTransition(
+            opacity: Tween(begin: 0.25, end: 1.0).animate(a),
+            child: child,
+          ),
+        );
+      },
+      child: ClipRRect(
+        key: ValueKey(from),
+        borderRadius: BorderRadius.circular(999),
+        child: FlagFill(from),
+      ),
+    ),
+  );
 
   Widget _ringed(Currency c, double size) => Container(
     decoration: BoxDecoration(
