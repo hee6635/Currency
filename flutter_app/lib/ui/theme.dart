@@ -60,9 +60,9 @@ class Palette extends ThemeExtension<Palette> {
     onNavyMuted: Color(0xFFBCC6E0),
     gold: Color(0xFFE8BE66),
     goldText: Color(0xFFE8BE66),
-    opBg: Color(0xFF1E2840),
-    opFg: Color(0xFFC9D5F2),
-    kBg: Color(0xFF332812),
+    opBg: Color(0xFF2C3958),
+    opFg: Color(0xFFE2E9FB),
+    kBg: Color(0xFF4A3915),
     kFg: Color(0xFFF0C766),
     danger: Color(0xFFFF8A7A),
   );

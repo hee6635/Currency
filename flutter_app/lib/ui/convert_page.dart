@@ -494,19 +494,20 @@ class Keypad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 갤럭시 계산기 비율: 버튼은 완전한 원, 가로 간격 ≈ 지름의 1/5, 세로 간격 ≈ 지름의 1/3.
-    // 공간이 모자라면 원 크기를 줄여서 이 비율을 지킨다.
+    // 갤럭시 계산기 비율.
+    // 폰: 버튼은 완전한 원, 가로 간격 ≈ 지름의 1/5, 세로 간격 ≈ 지름의 1/3.
+    // 폴드처럼 넓은 화면: 버튼을 가로로 긴 알약 모양으로 늘리고 양옆에 여백을 둔다.
     return LayoutBuilder(
       builder: (context, box) {
+        final w = box.maxWidth, h = box.maxHeight;
         final rows = _rows.length;
-        final d = math.min(
-          box.maxWidth / (4 + 3 * 0.2),
-          box.maxHeight / (rows + (rows - 1) * 0.32),
-        );
-        final vGap = ((box.maxHeight - rows * d) / (rows - 1)).clamp(
-          6.0,
-          d * 0.45,
-        );
+        final d = math.min(w / (4 + 3 * 0.2), h / (rows + (rows - 1) * 0.32));
+        final vGap = ((h - rows * d) / (rows - 1)).clamp(6.0, d * 0.45);
+        final wide = (w - 3 * 0.2 * d) / 4 > d * 1.3;
+        final keyW = wide
+            ? math.min((w * 0.88 - 3 * 0.4 * d) / 4, d * 1.75)
+            : d;
+        final hGap = wide ? d * 0.4 : (w - 4 * d) / 3;
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -515,15 +516,18 @@ class Keypad extends StatelessWidget {
               SizedBox(
                 height: d,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    for (final k in row)
-                      SizedBox.square(
-                        dimension: d,
+                    for (final (j, k) in row.indexed) ...[
+                      if (j > 0) SizedBox(width: hGap),
+                      SizedBox(
+                        width: keyW,
+                        height: d,
                         child: k == 'swap'
                             ? const _FlagSwapKey()
                             : _Key(k, _kind(k)),
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -533,6 +537,17 @@ class Keypad extends StatelessWidget {
       },
     );
   }
+}
+
+/// = 버튼 색: 결과 카드(바꿀 통화)의 색을 따라간다
+Color _eqColor(BuildContext context) {
+  final s = AppScope.of(context);
+  final c = currencyGradient(
+    s.from.other,
+    context.palette,
+    Theme.of(context).brightness,
+  );
+  return Color.lerp(c.first, c.last, 0.55)!;
 }
 
 class _Key extends StatelessWidget {
@@ -555,7 +570,7 @@ class _Key extends StatelessWidget {
     final p = context.palette;
     final (Color bg, Color fg) = switch (kind) {
       _KeyKind.op => (p.opBg, p.opFg),
-      _KeyKind.eq => (p.navy, p.onNavy),
+      _KeyKind.eq => (_eqColor(context), p.onNavy),
       _KeyKind.clear || _KeyKind.back => (p.surface, p.danger),
       _ => (p.surface, p.ink),
     };
@@ -609,62 +624,130 @@ class _Key extends StatelessWidget {
 class _FlagSwapKey extends StatelessWidget {
   const _FlagSwapKey();
 
+  /// 시안 비교용: pair(국기 두 개) / badge(국기 하나 + 바꾸기 표시) / text("동→원")
+  static const style = String.fromEnvironment(
+    'FLAG_STYLE',
+    defaultValue: 'text',
+  );
+
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final p = context.palette;
-    const dur = Duration(milliseconds: 320);
-    const curve = Curves.easeOutBack;
-
-    Widget flag(Currency c) {
-      final front = c == s.from;
-      return AnimatedAlign(
-        key: ValueKey(c),
-        duration: dur,
-        curve: curve,
-        alignment: front ? const Alignment(-1, 1) : const Alignment(1, -1),
-        child: AnimatedScale(
-          duration: dur,
-          curve: curve,
-          scale: front ? 1 : 0.8,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: front ? 0.25 : 0.12),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: FlagIcon(c, size: 28),
-          ),
-        ),
-      );
-    }
-
     return Semantics(
       button: true,
-      label: '통화 바꾸기, 지금 ${s.from.name} 입력',
+      label: '통화 바꾸기, 지금 ${s.from.name}에서 ${s.from.other.name}로',
       excludeSemantics: true,
       child: PressableKey(
-        color: p.surface,
+        color: style == 'text' ? p.kBg : p.surface,
         highlight: p.gold,
         onTap: () {
           HapticFeedback.mediumImpact();
           s.swap();
         },
-        child: SizedBox(
-          width: 54,
-          height: 46,
-          child: Stack(
-            // 앞에 올 국기를 나중에 그려서 위에 겹치게
-            children: [flag(s.from.other), flag(s.from)],
-          ),
-        ),
+        child: switch (style) {
+          'pair' => _pair(s.from),
+          'badge' => _badge(s.from, p),
+          _ => _text(s.from, p),
+        },
       ),
     );
   }
+
+  static const _dur = Duration(milliseconds: 320);
+
+  Widget _ringed(Currency c, double size) => Container(
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white, width: 2),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.2),
+          blurRadius: 5,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: FlagIcon(c, size: size),
+  );
+
+  // 국기 두 개: 입력 중인 통화가 앞에 크게
+  Widget _pair(Currency from) {
+    Widget flag(Currency c) {
+      final front = c == from;
+      return AnimatedAlign(
+        key: ValueKey(c),
+        duration: _dur,
+        curve: Curves.easeOutBack,
+        alignment: front ? const Alignment(-1, 1) : const Alignment(1, -1),
+        child: AnimatedScale(
+          duration: _dur,
+          curve: Curves.easeOutBack,
+          scale: front ? 1 : 0.8,
+          child: _ringed(c, 28),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 54,
+      height: 46,
+      child: Stack(children: [flag(from.other), flag(from)]),
+    );
+  }
+
+  // 국기 하나 + 오른쪽 아래 작은 바꾸기 표시
+  Widget _badge(Currency from, Palette p) => SizedBox(
+    width: 48,
+    height: 48,
+    child: Stack(
+      children: [
+        Center(
+          child: AnimatedSwitcher(
+            duration: _dur,
+            transitionBuilder: (child, a) => RotationTransition(
+              turns: Tween(begin: 0.5, end: 1.0).animate(a),
+              child: FadeTransition(opacity: a, child: child),
+            ),
+            child: KeyedSubtree(key: ValueKey(from), child: _ringed(from, 34)),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: p.gold,
+              shape: BoxShape.circle,
+              border: Border.all(color: p.surface, width: 2),
+            ),
+            child: Icon(Icons.swap_vert_rounded, size: 13, color: p.navy),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  // 글자로 방향 표시: "동→원"
+  Widget _text(Currency from, Palette p) => AnimatedSwitcher(
+    duration: _dur,
+    transitionBuilder: (child, a) => FadeTransition(
+      opacity: a,
+      child: ScaleTransition(
+        scale: Tween(begin: 0.7, end: 1.0).animate(a),
+        child: child,
+      ),
+    ),
+    child: Text(
+      '${from.unit}→${from.other.unit}',
+      key: ValueKey(from),
+      style: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        color: p.kFg,
+        letterSpacing: -0.5,
+      ),
+    ),
+  );
 }
