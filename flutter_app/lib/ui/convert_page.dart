@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -469,12 +471,14 @@ enum _KeyKind { num, small, op, eq, clear, back }
 class Keypad extends StatelessWidget {
   const Keypad({super.key});
 
+  // 갤럭시 계산기처럼 지우기 키는 맨 위 줄 (= 이나 0 누를 때 잘못 누르지 않게).
+  // 'swap' 자리(갤럭시의 %)는 국기 버튼: 누르면 동 ↔ 원 방향을 바꾼다.
   static const _rows = [
-    ['7', '8', '9', opDiv],
-    ['4', '5', '6', opMul],
-    ['1', '2', '3', opSub],
-    ['00', '0', '000', opAdd],
-    ['C', 'back', '='], // = 은 두 칸
+    ['C', 'back', 'swap', opDiv],
+    ['7', '8', '9', opMul],
+    ['4', '5', '6', opSub],
+    ['1', '2', '3', opAdd],
+    ['00', '0', '000', '='],
   ];
 
   static _KeyKind _kind(String k) {
@@ -490,26 +494,36 @@ class Keypad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const gap = 8.0;
+    // 갤럭시 계산기 비율: 버튼은 완전한 원, 가로 간격 ≈ 지름의 1/5, 세로 간격 ≈ 지름의 1/3.
+    // 공간이 모자라면 원 크기를 줄여서 이 비율을 지킨다.
     return LayoutBuilder(
       builder: (context, box) {
-        final cell = (box.maxWidth - gap * 3) / 4;
+        final rows = _rows.length;
+        final d = math.min(
+          box.maxWidth / (4 + 3 * 0.2),
+          box.maxHeight / (rows + (rows - 1) * 0.32),
+        );
+        final vGap = ((box.maxHeight - rows * d) / (rows - 1)).clamp(
+          6.0,
+          d * 0.45,
+        );
         return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             for (final (i, row) in _rows.indexed) ...[
-              if (i > 0) const SizedBox(height: gap),
-              Expanded(
+              if (i > 0) SizedBox(height: vGap),
+              SizedBox(
+                height: d,
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    for (final (j, k) in row.indexed) ...[
-                      if (j > 0) const SizedBox(width: gap),
-                      SizedBox(
-                        width: row.length == 3 && k == '='
-                            ? cell * 2 + gap
-                            : cell,
-                        child: _Key(k, _kind(k)),
+                    for (final k in row)
+                      SizedBox.square(
+                        dimension: d,
+                        child: k == 'swap'
+                            ? const _FlagSwapKey()
+                            : _Key(k, _kind(k)),
                       ),
-                    ],
                   ],
                 ),
               ),
@@ -542,7 +556,7 @@ class _Key extends StatelessWidget {
     final (Color bg, Color fg) = switch (kind) {
       _KeyKind.op => (p.opBg, p.opFg),
       _KeyKind.eq => (p.navy, p.onNavy),
-      _KeyKind.clear => (p.surface, p.danger),
+      _KeyKind.clear || _KeyKind.back => (p.surface, p.danger),
       _ => (p.surface, p.ink),
     };
     final double size = switch (kind) {
@@ -568,7 +582,7 @@ class _Key extends StatelessWidget {
     final s = AppScope.read(context);
     final highlight = switch (kind) {
       _KeyKind.op => p.navyHi,
-      _KeyKind.clear => p.danger,
+      _KeyKind.clear || _KeyKind.back => p.danger,
       _ => p.gold,
     };
     return Semantics(
@@ -585,6 +599,71 @@ class _Key extends StatelessWidget {
         },
         onLongPress: kind == _KeyKind.back ? () => s.press('C') : null,
         child: child,
+      ),
+    );
+  }
+}
+
+/// 키패드의 국기 버튼: 지금 입력하는 통화의 국기가 앞에 크게, 다른 통화 국기는 뒤에 작게.
+/// 누르면 두 국기가 자리를 바꾸며 동 ↔ 원 방향이 바뀐다 (위쪽 바꾸기 버튼과 같은 동작).
+class _FlagSwapKey extends StatelessWidget {
+  const _FlagSwapKey();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = context.palette;
+    const dur = Duration(milliseconds: 320);
+    const curve = Curves.easeOutBack;
+
+    Widget flag(Currency c) {
+      final front = c == s.from;
+      return AnimatedAlign(
+        key: ValueKey(c),
+        duration: dur,
+        curve: curve,
+        alignment: front ? const Alignment(-1, 1) : const Alignment(1, -1),
+        child: AnimatedScale(
+          duration: dur,
+          curve: curve,
+          scale: front ? 1 : 0.8,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: front ? 0.25 : 0.12),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: FlagIcon(c, size: 28),
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      button: true,
+      label: '통화 바꾸기, 지금 ${s.from.name} 입력',
+      excludeSemantics: true,
+      child: PressableKey(
+        color: p.surface,
+        highlight: p.gold,
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          s.swap();
+        },
+        child: SizedBox(
+          width: 54,
+          height: 46,
+          child: Stack(
+            // 앞에 올 국기를 나중에 그려서 위에 겹치게
+            children: [flag(s.from.other), flag(s.from)],
+          ),
+        ),
       ),
     );
   }
