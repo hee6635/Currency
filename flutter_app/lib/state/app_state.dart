@@ -181,14 +181,16 @@ class AppState extends ChangeNotifier {
   }
 
   /// 말로 한 문장을 금액으로 넣기. 금액이 없으면 false.
+  /// 말한 사칙연산("더하기", "빼기", "곱하기", "나누기")도 수식으로 넣고,
+  /// "얼마"/"결과"라고 했으면 = 를 누른 것처럼 하나로 합친다.
   bool applyHeard(String text) {
-    final a = parseSpokenAmount(text);
-    if (a == null) return false;
-    if (a.currency != null && a.currency != from) {
-      from = a.currency!;
+    final e = parseSpokenExpression(text);
+    if (e == null) return false;
+    if (e.currency != null && e.currency != from) {
+      from = e.currency!;
       _prefs?.setString('from', from == Currency.krw ? 'krw' : 'vnd');
     }
-    expr = a.value.toString();
+    expr = e.wantsResult ? applyKey(e.expr, '=') : e.expr;
     notifyListeners();
     return true;
   }

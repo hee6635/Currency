@@ -131,4 +131,37 @@ void main() {
       expect(parseSpokenAmount(''), isNull);
     });
   });
+
+  group('parseSpokenExpression — 말로 한 사칙연산', () {
+    String? e(String t) => parseSpokenExpression(t)?.expr;
+
+    test('네 가지 연산', () {
+      expect(e('이십만 더하기 오만'), '200000+50000');
+      expect(e('이십만 플러스 오만'), '200000+50000');
+      expect(e('오십만 빼기 삼만'), '500000−30000');
+      expect(e('오십만 마이너스 삼만'), '500000−30000');
+      expect(e('삼만 곱하기 사'), '30000×4');
+      expect(e('백만 나누기 4'), '1000000÷4');
+      expect(e('27만 + 3만'), '270000+30000');
+    });
+
+    test('"얼마", "결과"는 = 로', () {
+      final r = parseSpokenExpression('이십만 더하기 오만 얼마');
+      expect(r?.expr, '200000+50000');
+      expect(r?.wantsResult, isTrue);
+      expect(parseSpokenExpression('삼만 곱하기 사 결과')?.wantsResult, isTrue);
+      expect(parseSpokenExpression('오만')?.wantsResult, isFalse);
+      expect(applyKey('200000+50000', '='), '250000');
+    });
+
+    test('연산 없이 금액만', () {
+      expect(e('이십칠만 동'), '270000');
+      expect(parseSpokenExpression('오만 원')?.currency, Currency.krw);
+    });
+
+    test('끝이 잘린 말은 앞부분만', () {
+      expect(e('오만 더하기'), '50000');
+      expect(parseSpokenExpression('더하기'), isNull);
+    });
+  });
 }

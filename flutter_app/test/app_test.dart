@@ -18,9 +18,15 @@ RateService fakeService({bool fail = false}) => RateService(
   }),
 );
 
-Future<AppState> makeState({Map<String, Object> saved = const {}, bool fail = false}) async {
+Future<AppState> makeState({
+  Map<String, Object> saved = const {},
+  bool fail = false,
+}) async {
   SharedPreferences.setMockInitialValues(saved);
-  final s = AppState(service: fakeService(fail: fail), prefs: await SharedPreferences.getInstance());
+  final s = AppState(
+    service: fakeService(fail: fail),
+    prefs: await SharedPreferences.getInstance(),
+  );
   await s.load();
   await s.refresh();
   return s;
@@ -37,7 +43,10 @@ void main() {
   });
 
   test('인터넷이 안 되면 저장된 환율을 그대로 쓰고 오류만 표시', () async {
-    final s = await makeState(saved: {'rate': 18.2, 'rateTime': 0, 'source': 1}, fail: true);
+    final s = await makeState(
+      saved: {'rate': 18.2, 'rateTime': 0, 'source': 1},
+      fail: true,
+    );
     expect(s.rate, 18.2);
     expect(s.fetchError, isNotNull);
   });

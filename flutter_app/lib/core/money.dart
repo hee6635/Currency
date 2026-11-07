@@ -185,6 +185,14 @@ const _bigUnits = {'만': 10000, '억': 100000000};
 SpokenAmount? parseSpokenAmount(String text) {
   final t = text.replaceAll(RegExp(r'[\s,]'), '');
   if (t.isEmpty) return null;
+  // "사", "삼동"처럼 한 글자 숫자만 말한 경우
+  final single = RegExp(r'^([영공일이삼사오육칠팔구])(동|원)?$').firstMatch(t);
+  if (single != null && _sinoDigits[single.group(1)]! > 0) {
+    final c = single.group(2) == null
+        ? null
+        : (single.group(2) == '원' ? Currency.krw : Currency.vnd);
+    return SpokenAmount(_sinoDigits[single.group(1)]!, c);
+  }
 
   Currency? cur;
   if (RegExp(r'동|đồng|dong|VND', caseSensitive: false).hasMatch(t)) {
@@ -255,4 +263,58 @@ SpokenAmount? parseSpokenAmount(String text) {
   final v = (total + section + (numVal ?? 0)).round();
   if (v <= 0 || v.toString().length > 12) return null;
   return SpokenAmount(v, cur);
+}
+
+/// 말로 한 계산식 해석 결과
+class SpokenExpr {
+  const SpokenExpr(this.expr, this.currency, {required this.wantsResult});
+
+  /// 키패드 수식 형식 ("200000+50000")
+  final String expr;
+  final Currency? currency;
+
+  /// "얼마", "결과" 같은 말로 = 를 원했는지
+  final bool wantsResult;
+}
+
+final _opWords = RegExp(r'더하기|플러스|빼기|마이너스|곱하기|곱|나누기|[+＋\-−×xX*÷/]');
+final _resultWords = RegExp(r'얼마|결과|이퀄|equals?|=', caseSensitive: false);
+
+String _opFor(String w) {
+  if (RegExp(r'더하기|플러스|[+＋]').hasMatch(w)) return opAdd;
+  if (RegExp(r'빼기|마이너스|[\-−]').hasMatch(w)) return opSub;
+  if (RegExp(r'곱하기|곱|[×xX*]').hasMatch(w)) return opMul;
+  return opDiv;
+}
+
+/// 음성인식 결과를 계산식으로: "이십만 더하기 오만 얼마" → "200000+50000" (결과 원함).
+/// 연산이 없으면 금액 하나. 해석할 수 없으면 null.
+SpokenExpr? parseSpokenExpression(String text) {
+  final wantsResult = _resultWords.hasMatch(text);
+  final body = text.replaceAll(_resultWords, ' ');
+  final parts = <String>[];
+  final ops = <String>[];
+  var last = 0;
+  for (final m in _opWords.allMatches(body)) {
+    parts.add(body.substring(last, m.start));
+    ops.add(_opFor(m.group(0)!));
+    last = m.end;
+  }
+  parts.add(body.substring(last));
+
+  final buf = StringBuffer();
+  Currency? cur;
+  for (var i = 0; i < parts.length; i++) {
+    final a = parseSpokenAmount(parts[i]);
+    if (a == null) {
+      // 맨 끝 숫자가 빠진 "오만 더하기" 같은 경우는 앞부분만 쓴다
+      if (i == parts.length - 1 && i > 0) break;
+      return null;
+    }
+    cur ??= a.currency;
+    if (a.currency != null) cur = a.currency;
+    if (i > 0) buf.write(ops[i - 1]);
+    buf.write(a.value);
+  }
+  return SpokenExpr(buf.toString(), cur, wantsResult: wantsResult);
 }
