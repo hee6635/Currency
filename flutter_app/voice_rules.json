@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "updated": "2026-11-07",
+  "note": "앱이 켜질 때 받아오는 음성 보정 규칙. 앱 안의 기본 보정보다 먼저 적용됨. fixes: 정규식 → 바꿀 말($1~$9), phrases: 들린 말 → 원래 말, timing: 밀리초",
+  "fixes": [],
+  "phrases": {},
+  "timing": {
+    "releaseDelayMs": 1200,
+    "finalWaitMs": 3500
+  }
+}

@@ -9,6 +9,7 @@ import '../core/money.dart';
 import '../core/rate_service.dart';
 import '../core/voice.dart';
 import '../core/voice_log.dart';
+import '../core/voice_rules.dart';
 
 enum RateSource { none, api, manual }
 
@@ -47,9 +48,70 @@ class AppState extends ChangeNotifier {
   /// 음성 기록 (말할 때마다, 실패도 포함)
   final voiceLog = VoiceLog();
 
+  /// 인터넷에서 받아온 음성 보정 규칙 (재설치 없이 갱신)
+  VoiceRules rules = const VoiceRules();
+
+  /// 내 폰에서 가르친 말: 들린 말(띄어쓰기 없이) → 원래 숫자
+  Map<String, String> learned = {};
+
+  void _applyRules() {
+    spokenExtraFixes = rules.fixes;
+    spokenPhrases = {...rules.phrases, ...learned};
+  }
+
+  /// 앱 켤 때: 저장해 둔 규칙을 먼저 쓰고, 인터넷에서 더 새 규칙이 있으면 바꾼다
+  Future<void> _loadRules(SharedPreferences p) async {
+    final cached = p.getString('voiceRules');
+    if (cached != null) rules = VoiceRules.parse(cached) ?? rules;
+    try {
+      final m = jsonDecode(p.getString('learned') ?? '{}') as Map;
+      learned = m.map((k, v) => MapEntry(k as String, v as String));
+    } catch (_) {
+      learned = {};
+    }
+    _applyRules();
+    final got = await VoiceRulesService().fetch();
+    if (got != null && got.$1.version > rules.version) {
+      rules = got.$1;
+      p.setString('voiceRules', got.$2);
+      _applyRules();
+      notifyListeners();
+    }
+  }
+
+  /// 마지막 말을 반영하기 전의 식, 마지막으로 들린 말 (고쳐서 기억하기용)
+  String? exprBeforeVoice;
+  String lastHeardRaw = '';
+
+  /// 들린 말을 원래 숫자로 기억한다. [apply]면 마지막 말 반영을 되돌리고
+  /// 고친 숫자로 다시 반영, 기록에도 "틀림" 표시.
+  void teach(String heardText, String number, {bool apply = true}) {
+    final key = VoiceRules.compact(heardText);
+    if (key.isEmpty || number.isEmpty) return;
+    learned = {...learned, key: number};
+    _prefs?.setString('learned', jsonEncode(learned));
+    _applyRules();
+    if (apply) {
+      voiceProblem = null;
+      if (exprBeforeVoice != null) expr = exprBeforeVoice!;
+      applyHeard(number);
+      final last = voiceLog.entries.isEmpty ? null : voiceLog.entries.last;
+      if (last != null && !last.wrong) voiceLog.toggleWrong(last);
+    }
+    notifyListeners();
+  }
+
+  void forgetLearned() {
+    learned = {};
+    _prefs?.setString('learned', '{}');
+    _applyRules();
+    notifyListeners();
+  }
+
   Future<void> load() async {
     voiceLog.load();
     final p = _prefs ??= await SharedPreferences.getInstance();
+    _loadRules(p);
     final r = p.getDouble('rate');
     rate = (r != null && r > 0) ? r : null;
     final t = p.getInt('rateTime');
@@ -260,6 +322,8 @@ class AppState extends ChangeNotifier {
       final best = _bestHeard();
       preview = null;
       final before = notice?.id;
+      exprBeforeVoice = expr;
+      lastHeardRaw = best ?? '';
       if (best != null && best.isNotEmpty) {
         heard = best;
         final msg = applyHeard(best);
@@ -367,12 +431,12 @@ class AppState extends ChangeNotifier {
     _released = true;
     _ev('뗌');
     _releaseTimer?.cancel();
-    _releaseTimer = Timer(const Duration(milliseconds: 1200), () {
+    _releaseTimer = Timer(Duration(milliseconds: rules.releaseDelayMs), () {
       if (_applied) return;
       _ev('멈춤');
       _voice?.stop();
       _releaseTimer = Timer(
-        const Duration(milliseconds: 3500),
+        Duration(milliseconds: rules.finalWaitMs),
         () => _finish?.call(),
       );
     });

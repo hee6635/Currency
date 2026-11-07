@@ -5,10 +5,13 @@ on:
     paths:
       - "flutter_app/**"
       - ".github/workflows/flutter.yml"
+      # 음성 보정 규칙만 바뀐 건 앱이 켜질 때 받아오므로 빌드할 필요 없음
+      - "!flutter_app/voice_rules.json"
   pull_request:
     paths:
       - "flutter_app/**"
       - ".github/workflows/flutter.yml"
+      - "!flutter_app/voice_rules.json"
   workflow_dispatch:
 
 jobs:

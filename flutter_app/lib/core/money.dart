@@ -302,10 +302,30 @@ final List<(RegExp, String)> _fixes = [
   (RegExp(r'([만천억])이(?=\s|$)'), r'$1'),
 ];
 
+/// 앱 밖에서 받아온 보정 규칙(인터넷)과 내 폰에서 가르친 말.
+/// AppState가 채워 넣는다.
+List<(RegExp, String)> spokenExtraFixes = [];
+Map<String, String> spokenPhrases = {};
+
 /// 음성인식 결과를 계산하기 좋게 다듬기
 String normalizeSpoken(String text) {
   var t = ' $text ';
-  for (final (re, rep) in _fixes) {
+  // 1) 통째로 바꿀 말 (가르친 말 등): 띄어쓰기 없이 비교, 긴 것부터
+  if (spokenPhrases.isNotEmpty) {
+    var c = text.replaceAll(RegExp(r'\s+'), '');
+    var hit = false;
+    final keys = spokenPhrases.keys.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    for (final k in keys) {
+      if (k.isNotEmpty && c.contains(k)) {
+        c = c.replaceAll(k, ' ${spokenPhrases[k]} ');
+        hit = true;
+      }
+    }
+    if (hit) t = ' $c ';
+  }
+  // 2) 받아온 규칙 → 3) 앱 기본 규칙
+  for (final (re, rep) in [...spokenExtraFixes, ..._fixes]) {
     t = t.replaceAllMapped(re, (m) {
       var out = rep;
       for (var g = 1; g <= m.groupCount; g++) {

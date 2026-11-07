@@ -35,3 +35,10 @@ lib/
 ## 그림 출처
 - 보여주기 카드 그림: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT, `assets/phrases/LICENSE-fluentui-emoji.txt`)
 - 지폐 사진: 저장소 주인이 제공한 베트남 지폐 이미지에서 앞·뒷면을 잘라 사용 (`assets/notes/`)
+
+## 음성 보정 규칙 (재설치 없이 갱신)
+- `voice_rules.json`: 앱이 켜질 때 GitHub(작업 브랜치·main 중 버전 높은 쪽)에서 받아와 기본 보정보다 먼저 적용
+  - `fixes`: `{"from": 정규식, "to": 바꿀 말($1~$9)}` / `phrases`: `{"들린 말": "원래 말"}` / `timing`: 손 뗀 뒤 더 듣는 시간 등
+  - 바꿀 때는 `version`을 올릴 것. 이 파일만 바뀐 push는 APK를 빌드하지 않음
+- 폰에서 가르친 말(틀렸어요 · 고쳐서 기억하기)은 그 폰에만 저장
+- 앱의 음성 기록 ☁ 버튼 → `[voice-log]` 이슈 → 4시간마다 AI가 읽고 규칙 갱신

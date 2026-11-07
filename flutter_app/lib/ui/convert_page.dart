@@ -7,6 +7,7 @@ import '../core/money.dart';
 import '../state/app_state.dart';
 import 'common.dart';
 import 'guide_page.dart';
+import 'teach_dialog.dart';
 import 'motion.dart';
 import 'rate_sheet.dart';
 import 'theme.dart';
@@ -570,6 +571,20 @@ class _VoicePanel extends StatelessWidget {
           const SizedBox(height: 20),
           const _TalkButton(),
           const SizedBox(height: 12),
+          if (!s.listening && s.lastHeardRaw.isNotEmpty)
+            TextButton.icon(
+              onPressed: () async {
+                final heard = s.lastHeardRaw;
+                final n = await askOriginalNumber(context, heard);
+                if (n == null) return;
+                s.teach(heard, n);
+                if (context.mounted) {
+                  toast(context, '"$heard" → ${fmt(int.parse(n))} 으로 기억할게요');
+                }
+              },
+              icon: const Icon(Icons.school_outlined, size: 18),
+              label: const Text('틀렸어요 · 고쳐서 기억하기'),
+            ),
           if (!s.listening && s.voiceProblem != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),

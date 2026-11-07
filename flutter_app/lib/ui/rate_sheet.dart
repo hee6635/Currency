@@ -250,7 +250,7 @@ class _RateSheetState extends State<_RateSheet> {
                 nav.pop();
                 nav.push(
                   MaterialPageRoute<void>(
-                    builder: (_) => VoiceLogPage(log: s.voiceLog),
+                    builder: (_) => VoiceLogPage(log: s.voiceLog, state: s),
                   ),
                 );
               },
