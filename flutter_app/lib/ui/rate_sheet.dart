@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/money.dart';
 import '../state/app_state.dart';
 import 'guide_page.dart';
+import 'voice_log_page.dart';
 import 'theme.dart';
 
 void showRateSheet(BuildContext context) {
@@ -238,6 +239,22 @@ class _RateSheetState extends State<_RateSheet> {
             ),
             const SizedBox(height: 18),
             Divider(color: p.line, height: 1),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.history_rounded, color: p.goldText),
+              title: Text('음성 기록 (${s.voiceLog.entries.length}개)'),
+              subtitle: Text('말한 내용·인식 결과 · 백업해서 보내면 보정에 써요', style: muted),
+              trailing: Icon(Icons.chevron_right_rounded, color: p.muted),
+              onTap: () {
+                final nav = Navigator.of(context);
+                nav.pop();
+                nav.push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => VoiceLogPage(log: s.voiceLog),
+                  ),
+                );
+              },
+            ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.menu_book_rounded, color: p.goldText),

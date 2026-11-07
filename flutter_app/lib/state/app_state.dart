@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/money.dart';
 import '../core/rate_service.dart';
 import '../core/voice.dart';
+import '../core/voice_log.dart';
 
 enum RateSource { none, api, manual }
 
@@ -43,7 +44,11 @@ class AppState extends ChangeNotifier {
   Map<int, int> noteCounts = {};
   String memo = defaultMemo;
 
+  /// 음성 기록 (말할 때마다, 실패도 포함)
+  final voiceLog = VoiceLog();
+
   Future<void> load() async {
+    voiceLog.load();
     final p = _prefs ??= await SharedPreferences.getInstance();
     final r = p.getDouble('rate');
     rate = (r != null && r > 0) ? r : null;
@@ -211,6 +216,13 @@ class AppState extends ChangeNotifier {
     preview = (step != null && step.changed) ? step.headline : null;
   }
 
+  final List<String> _events = [];
+  final Stopwatch _clock = Stopwatch();
+  void _ev(String name) => _events.add(
+    '$name ${(_clock.elapsedMilliseconds / 1000).toStringAsFixed(1)}',
+  );
+  bool _restarting = false;
+
   /// 무전기 방식: 누르는 순간 듣기 시작
   Future<void> pressTalk(void Function(String) onMessage) async {
     if (listening) return;
@@ -224,6 +236,12 @@ class AppState extends ChangeNotifier {
     _candidates = const [];
     _released = false;
     _applied = false;
+    _restarting = false;
+    _events.clear();
+    _clock
+      ..reset()
+      ..start();
+    _ev('누름');
     notifyListeners();
 
     // 알려줄 말은 음성 창 안에도 보이게
@@ -241,6 +259,7 @@ class AppState extends ChangeNotifier {
       voiceReady = false;
       final best = _bestHeard();
       preview = null;
+      final before = notice?.id;
       if (best != null && best.isNotEmpty) {
         heard = best;
         final msg = applyHeard(best);
@@ -253,12 +272,36 @@ class AppState extends ChangeNotifier {
               : '버튼을 누른 채로 진동이 올 때까지 기다린 뒤 말해 주세요',
         );
       }
+      // 기록 남기기 (실패도)
+      _ev('끝');
+      final prefix = _segments.join(' ');
+      voiceLog.add(
+        VoiceLogEntry(
+          at: DateTime.now(),
+          currency: from.unit,
+          heard: [
+            for (final c in _candidates) '$prefix $c'.trim(),
+            if (_candidates.isEmpty && prefix.isNotEmpty) prefix,
+          ],
+          chosen: best,
+          result: notice != null && notice!.id != before
+              ? notice!.headline
+              : '',
+          problem: voiceProblem,
+          events: List.of(_events),
+        ),
+      );
       notifyListeners();
     }
 
     late Future<String?> Function() listen;
     listen = () => voice.start(
+      onEvent: (e) {
+        if (e.contains('listening') && !e.contains('notListening')) return;
+        _ev(e);
+      },
       onReady: () {
+        _ev('준비');
         voiceReady = true;
         if (!wasReady) HapticFeedback.mediumImpact();
         wasReady = true;
@@ -267,6 +310,7 @@ class AppState extends ChangeNotifier {
       onText: (cands, isFinal) {
         _candidates = cands;
         _updatePreview();
+        if (isFinal) _ev('결과');
         notifyListeners();
         if (isFinal && _released) finish();
       },
@@ -275,13 +319,21 @@ class AppState extends ChangeNotifier {
           finish();
           return;
         }
-        // 아직 누르고 있는데 폰 음성인식이 혼자 끝남(잠깐 쉼) → 모아 두고 다시 듣기
+        // 아직 누르고 있는데 폰 음성인식이 혼자 끝남(잠깐 쉼, 말 시작 전 조용함, 못 알아들음)
+        // → 들은 건 모아 두고 바로 다시 듣기. 손을 뗄 때까지 계속 듣는다.
+        if (_restarting) return;
+        _restarting = true;
         final cur = _candidates.isEmpty ? '' : _candidates.first;
         if (cur.isNotEmpty) _segments.add(cur);
         _candidates = const [];
         Future.delayed(const Duration(milliseconds: 150), () async {
-          if (_released || _applied) return finish();
+          if (_released || _applied) {
+            _restarting = false;
+            return finish();
+          }
+          _ev('다시듣기');
           final err = await listen();
+          _restarting = false;
           if (err != null) finish();
         });
       },
@@ -313,6 +365,7 @@ class AppState extends ChangeNotifier {
   void releaseTalk() {
     if (!listening || _released) return;
     _released = true;
+    _ev('뗌');
     _voice?.stop();
     _releaseTimer?.cancel();
     _releaseTimer = Timer(const Duration(seconds: 3), () => _finish?.call());

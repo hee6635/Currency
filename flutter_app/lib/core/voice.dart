@@ -12,6 +12,7 @@ class VoiceInput {
   bool noKorean = false;
   void Function()? _onDone;
   void Function()? _onReady;
+  void Function(String)? _onEvent;
   void Function(String)? _onError;
 
   bool get isListening => _stt.isListening;
@@ -23,9 +24,11 @@ class VoiceInput {
     required void Function() onDone,
     required void Function(String message) onError,
     void Function()? onReady,
+    void Function(String event)? onEvent,
   }) async {
     _onDone = onDone;
     _onReady = onReady;
+    _onEvent = onEvent;
     _onError = onError;
     if (!_ready) {
       try {
@@ -69,6 +72,7 @@ class VoiceInput {
   Future<void> stop() => _stt.stop();
 
   void _status(String status) {
+    _onEvent?.call('상태 $status');
     if (status == SpeechToText.listeningStatus) _onReady?.call();
     // 'notListening'은 손을 떼서 멈춘 순간에도 오고, 최종 결과는 그 뒤에 온다.
     // 끝은 최종 결과까지 전달된 뒤의 'done'으로만 판단한다.
@@ -76,6 +80,7 @@ class VoiceInput {
   }
 
   void _error(SpeechRecognitionError e) {
+    _onEvent?.call('오류 ${e.errorMsg}');
     final msg = switch (e.errorMsg) {
       'error_no_match' || 'error_speech_timeout' => '잘 안 들렸어요. 다시 말해 주세요',
       'error_network' || 'error_network_timeout' => '인터넷 연결이 필요해요',
