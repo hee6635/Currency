@@ -265,6 +265,58 @@ SpokenAmount? parseSpokenAmount(String text) {
   return SpokenAmount(v, cur);
 }
 
+/// 음성인식이 비슷한 소리로 잘못 알아듣는 말 보정 (순서대로 적용).
+/// 예: "이촌 동" → "이천 동", "고파기" → "곱하기", "오만이요" → "오만"
+final List<(RegExp, String)> _fixes = [
+  // 전부 지우기
+  (RegExp(r'(다|모두|전부|싹)\s*(지워|지어|치워|지워줘|지우기|삭제)|처음부터|리셋|초기화'), ' 다지워 '),
+  // 하나 지우기
+  (RegExp(r'지워줘|지어|치워|지우기|삭제'), ' 지워 '),
+  // 연산
+  (RegExp(r'더\s*하기|더해\s*(요|줘)?|더하고|풀러스|플러스'), ' 더하기 '),
+  (RegExp(r'뺴기|배기|빼기|빼고|마이나스|마이너스|빼\s*(요|줘)'), ' 빼기 '),
+  (RegExp(r'곱\s*하기|고파기|곱파기|고바기|곱빼기|곱해\s*(요|줘)?|곱하고|곱셈'), ' 곱하기 '),
+  (RegExp(r'나눠\s*(요|줘)?|나누고|나뉘기|나누기|나눗셈'), ' 나누기 '),
+  // 결과
+  (RegExp(r'얼마\s*(야|지|예요|에요|요)?|계산\s*해?\s*(줘|요)?|결과|합계'), ' 얼마 '),
+  // 고유어 숫자 (곱하기 셋 등)
+  (RegExp(r'하나'), '1'),
+  (RegExp(r'(?<=^|\s)둘(?=\s|$)'), '2'),
+  (RegExp(r'셋'), '3'),
+  (RegExp(r'넷'), '4'),
+  (RegExp(r'다섯'), '5'),
+  (RegExp(r'여섯'), '6'),
+  (RegExp(r'일곱'), '7'),
+  (RegExp(r'여덟|여덜'), '8'),
+  (RegExp(r'아홉'), '9'),
+  (RegExp(r'(?<=^|\s)열(?=\s|$)'), '10'),
+  // 숫자 단위 오인식: 이촌/이전 → 이천, 오망 → 오만, 심만 → 십만, 빽만 → 백만
+  (RegExp(r'([0-9일이삼사오육칠팔구])\s*(촌|전|쳔|철)'), r'$1천'),
+  (RegExp(r'([0-9일이삼사오육칠팔구십백천])\s*망'), r'$1만'),
+  (RegExp(r'(^|[\s이삼사오육칠팔구])(심|쉽)(?=[\s일이삼사오육칠팔구만천백]|$)'), r'$1십'),
+  (RegExp(r'빽|벡'), '백'),
+  // 숫자 뒤 띄어 읽기: "오 만" → "오만"
+  (RegExp(r'([0-9일이삼사오육칠팔구십백천])\s+(만|천|백|억)'), r'$1$2'),
+  // 끝말: "오만이요", "삼천원이에요", "이만이" → 숫자만
+  (RegExp(r'(이요|이에요|예요|에요|입니다|이야|이고|요)(?=\s|$)'), ' '),
+  (RegExp(r'([만천억])이(?=\s|$)'), r'$1'),
+];
+
+/// 음성인식 결과를 계산하기 좋게 다듬기
+String normalizeSpoken(String text) {
+  var t = ' $text ';
+  for (final (re, rep) in _fixes) {
+    t = t.replaceAllMapped(re, (m) {
+      var out = rep;
+      for (var g = 1; g <= m.groupCount; g++) {
+        out = out.replaceAll('\$$g', m.group(g) ?? '');
+      }
+      return out;
+    });
+  }
+  return t.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
 final _opWords = RegExp(r'더하기|플러스|빼기|마이너스|곱하기|곱|나누기|[+＋\-−×xX*÷/]');
 final _resultWords = RegExp(r'얼마|결과|이퀄|equals?|=', caseSensitive: false);
 final _clearAll = RegExp(r'다지워|모두지워|전부지워|새로');
@@ -312,7 +364,8 @@ class VoiceStep {
 /// - "지워": 마지막 덩어리 하나, "다 지워"/"새로": 전부.
 /// - "얼마"/"결과": = 를 누른 것처럼 합친다.
 /// - "원"/"동"은 무시한다 (방향은 화면에서만 바꾼다).
-VoiceStep applySpoken(String expr, String text, {required bool addMode}) {
+VoiceStep applySpoken(String expr, String raw, {required bool addMode}) {
+  final text = normalizeSpoken(raw);
   final compact = text.replaceAll(RegExp(r'\s'), '');
   if (_clearAll.hasMatch(compact)) return const VoiceStep('', '전부 지움');
 

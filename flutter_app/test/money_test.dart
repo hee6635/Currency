@@ -190,4 +190,39 @@ void main() {
       expect(r.changed, isFalse);
     });
   });
+
+  group('normalizeSpoken — 잘못 알아들은 말 보정', () {
+    String say(String t, {String e = ''}) =>
+        applySpoken(e, t, addMode: true).expr;
+
+    test('숫자 단위 오인식', () {
+      expect(say('이촌동'), '2000');
+      expect(say('이촌 동'), '2000');
+      expect(say('삼전 원'), '3000');
+      expect(say('오망'), '50000');
+      expect(say('심만'), '100000');
+      expect(say('심오만'), '150000');
+      expect(say('빽만'), '1000000');
+      expect(say('오 만'), '50000');
+      expect(say('이만 오촌'), '25000');
+    });
+
+    test('끝말 떼기', () {
+      expect(say('오만이요'), '50000');
+      expect(say('삼천원이에요'), '3000');
+      expect(say('이만이'), '20000');
+      expect(say('이십이'), '22');
+    });
+
+    test('연산·명령 비슷한 말', () {
+      expect(say('삼만 고파기 셋'), '30000×3');
+      expect(say('오만 배기 삼천'), '50000−3000');
+      expect(say('오만 더 하기 삼천'), '50000+3000');
+      expect(say('십만 나눠 4'), '100000÷4');
+      expect(say('오만 플러스 삼만 얼마야'), '80000');
+      expect(say('치워', e: '50000+3000'), '50000+');
+      expect(say('전부 지워', e: '50000+3000'), '');
+      expect(say('처음부터', e: '50000'), '');
+    });
+  });
 }

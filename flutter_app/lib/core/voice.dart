@@ -18,7 +18,8 @@ class VoiceInput {
 
   /// 듣기 시작. 시작하지 못하면 이유(한국어 문장)를 돌려준다.
   Future<String?> start({
-    required void Function(String text, bool isFinal) onText,
+    /// 후보들(가장 그럴듯한 것부터)과 최종 여부
+    required void Function(List<String> candidates, bool isFinal) onText,
     required void Function() onDone,
     required void Function(String message) onError,
     void Function()? onReady,
@@ -53,10 +54,14 @@ class VoiceInput {
         pauseFor: const Duration(seconds: 30),
         partialResults: true,
         cancelOnError: true,
-        listenMode: ListenMode.dictation,
+        // 짧은 말(숫자, 계산)에 맞춘 인식 방식
+        listenMode: ListenMode.search,
       ),
-      onResult: (SpeechRecognitionResult r) =>
-          onText(r.recognizedWords, r.finalResult),
+      onResult: (SpeechRecognitionResult r) => onText([
+        r.recognizedWords,
+        for (final a in r.alternates)
+          if (a.recognizedWords != r.recognizedWords) a.recognizedWords,
+      ], r.finalResult),
     );
     return null;
   }

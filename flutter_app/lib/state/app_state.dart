@@ -177,6 +177,40 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 듣는 중에 미리 보여줄 결과 ("2,000", "+ 2,000"). 해석 못 하면 null
+  String? preview;
+
+  /// 누르고 있는 동안 음성인식이 스스로 끝나서 모아 둔 말
+  final List<String> _segments = [];
+  List<String> _candidates = const [];
+
+  /// 모아 둔 말 + 지금 후보들 중에서 숫자로 해석되는 가장 좋은 문장
+  String? _bestHeard() {
+    final prefix = _segments.join(' ');
+    final options = [
+      for (final c in _candidates.isEmpty ? const [''] : _candidates)
+        '$prefix $c'.trim(),
+    ].where((t) => t.isNotEmpty).toList();
+    if (options.isEmpty) return null;
+    for (final t in options) {
+      final step = applySpoken(expr, t, addMode: addMode);
+      if (step.changed && step.message == null) return t;
+    }
+    for (final t in options) {
+      if (applySpoken(expr, t, addMode: addMode).changed) return t;
+    }
+    return options.first;
+  }
+
+  void _updatePreview() {
+    final best = _bestHeard();
+    heard = best ?? '';
+    final step = best == null
+        ? null
+        : applySpoken(expr, best, addMode: addMode);
+    preview = (step != null && step.changed) ? step.headline : null;
+  }
+
   /// 무전기 방식: 누르는 순간 듣기 시작
   Future<void> pressTalk(void Function(String) onMessage) async {
     if (listening) return;
@@ -185,15 +219,18 @@ class AppState extends ChangeNotifier {
     voiceReady = false;
     voiceProblem = null;
     heard = '';
+    preview = null;
+    _segments.clear();
+    _candidates = const [];
+    _released = false;
+    _applied = false;
+    notifyListeners();
+
     // 알려줄 말은 음성 창 안에도 보이게
     void report(String m) {
       voiceProblem = m;
       onMessage(m);
     }
-
-    _released = false;
-    _applied = false;
-    notifyListeners();
 
     var wasReady = false;
     void finish() {
@@ -202,9 +239,12 @@ class AppState extends ChangeNotifier {
       _releaseTimer?.cancel();
       listening = false;
       voiceReady = false;
-      if (heard.isNotEmpty) {
-        final msg = applyHeard(heard);
-        if (msg != null) report(msg);
+      final best = _bestHeard();
+      preview = null;
+      if (best != null && best.isNotEmpty) {
+        heard = best;
+        final msg = applyHeard(best);
+        if (msg != null) report('"$best"(으)로 들렸어요. $msg');
       } else if (voiceProblem == null) {
         report(
           wasReady
@@ -216,26 +256,45 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
 
-    _finish = finish;
-    final err = await voice.start(
+    late Future<String?> Function() listen;
+    listen = () => voice.start(
       onReady: () {
         voiceReady = true;
+        if (!wasReady) HapticFeedback.mediumImpact();
         wasReady = true;
-        HapticFeedback.mediumImpact();
         notifyListeners();
       },
-      onText: (text, isFinal) {
-        heard = text;
+      onText: (cands, isFinal) {
+        _candidates = cands;
+        _updatePreview();
         notifyListeners();
         if (isFinal && _released) finish();
       },
-      // 손을 떼기 전에 음성인식이 스스로 끝나면(오래 조용함) 그때까지 들은 것 반영
-      onDone: finish,
+      onDone: () {
+        if (_released || _applied) {
+          finish();
+          return;
+        }
+        // 아직 누르고 있는데 폰 음성인식이 혼자 끝남(잠깐 쉼) → 모아 두고 다시 듣기
+        final cur = _candidates.isEmpty ? '' : _candidates.first;
+        if (cur.isNotEmpty) _segments.add(cur);
+        _candidates = const [];
+        Future.delayed(const Duration(milliseconds: 150), () async {
+          if (_released || _applied) return finish();
+          final err = await listen();
+          if (err != null) finish();
+        });
+      },
       onError: (m) {
+        // 누르고 있는 중 "못 들음"은 다시 듣기로 넘기고, 나머지 오류만 알림
+        if (!_released && m.startsWith('잘 안 들렸어요')) return;
         report(m);
         finish();
       },
     );
+
+    _finish = finish;
+    final err = await listen();
     if (err != null) {
       listening = false;
       _applied = true;

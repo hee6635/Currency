@@ -427,7 +427,11 @@ class _VoicePanel extends StatelessWidget {
     // 가운데 큰 글자: 듣는 중이면 들리는 말, 아니면 마지막으로 반영한 내용
     final String big;
     final bool bigMuted;
-    if (s.listening) {
+    if (s.listening && s.preview != null) {
+      // 말하는 중에도 알아들은 숫자를 바로 보여준다
+      big = s.preview!;
+      bigMuted = false;
+    } else if (s.listening) {
       big = s.heard.isNotEmpty
           ? '${s.heard}…'
           : (s.voiceReady ? '말하세요' : '준비 중…');
@@ -500,7 +504,18 @@ class _VoicePanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          // 듣는 중: 폰이 들은 말 그대로 (작게)
+          SizedBox(
+            height: 22,
+            child: s.listening && s.preview != null && s.heard.isNotEmpty
+                ? Text(
+                    '"${s.heard}"',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, color: p.muted),
+                  )
+                : null,
+          ),
           // 큰 글자: 바뀔 때마다 확대되듯 튀어나온다
           SizedBox(
             height: 72,
@@ -518,8 +533,9 @@ class _VoicePanel extends StatelessWidget {
                   ),
                 ),
                 child: FittedBox(
+                  // 듣는 중 숫자가 바뀔 때마다, 손을 뗀 뒤 확정될 때마다 튀어나옴
                   key: ValueKey(
-                    '${s.listening}|${s.listening ? '' : s.notice?.id}',
+                    s.listening ? 'L|${s.preview}' : 'N|${s.notice?.id}',
                   ),
                   fit: BoxFit.scaleDown,
                   child: Text(
