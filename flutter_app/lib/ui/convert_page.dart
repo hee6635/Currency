@@ -554,9 +554,22 @@ class _VoicePanel extends StatelessWidget {
           const SizedBox(height: 20),
           const _TalkButton(),
           const SizedBox(height: 12),
+          if (!s.listening && s.voiceProblem != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                s.voiceProblem!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: p.danger,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           Text(
             s.listening
-                ? (s.voiceReady ? '듣는 중 · 손을 떼면 입력돼요' : '진동이 오면 말하세요')
+                ? (s.voiceReady ? '듣는 중 · 다 말한 뒤 손을 떼세요' : '잠깐만요… 진동이 오면 말하세요')
                 : '누르고 있는 동안 들어요 · "지워", "얼마"도 돼요',
             style: TextStyle(
               fontSize: 13,

@@ -156,6 +156,9 @@ class AppState extends ChangeNotifier {
 
   /// 음성인식이 실제로 듣기 시작했는지 (이때 진동, "말하세요")
   bool voiceReady = false;
+
+  /// 음성 창에 보여줄 문제 안내 (권한, 못 들음 등). 없으면 null
+  String? voiceProblem;
   String heard = '';
   bool _released = false;
   bool _applied = false;
@@ -180,11 +183,19 @@ class AppState extends ChangeNotifier {
     final voice = _voice ??= VoiceInput();
     listening = true;
     voiceReady = false;
+    voiceProblem = null;
     heard = '';
+    // 알려줄 말은 음성 창 안에도 보이게
+    void report(String m) {
+      voiceProblem = m;
+      onMessage(m);
+    }
+
     _released = false;
     _applied = false;
     notifyListeners();
 
+    var wasReady = false;
     void finish() {
       if (_applied) return;
       _applied = true;
@@ -193,7 +204,14 @@ class AppState extends ChangeNotifier {
       voiceReady = false;
       if (heard.isNotEmpty) {
         final msg = applyHeard(heard);
-        if (msg != null) onMessage(msg);
+        if (msg != null) report(msg);
+      } else if (voiceProblem == null) {
+        report(
+          wasReady
+              ? '아무 말도 못 들었어요. 진동이 온 뒤 말하고, 다 말한 다음 손을 떼 주세요'
+              // 듣기가 시작되기 전에 손을 뗌 (처음엔 마이크 권한 창 때문일 수 있음)
+              : '버튼을 누른 채로 진동이 올 때까지 기다린 뒤 말해 주세요',
+        );
       }
       notifyListeners();
     }
@@ -202,6 +220,7 @@ class AppState extends ChangeNotifier {
     final err = await voice.start(
       onReady: () {
         voiceReady = true;
+        wasReady = true;
         HapticFeedback.mediumImpact();
         notifyListeners();
       },
@@ -213,31 +232,31 @@ class AppState extends ChangeNotifier {
       // 손을 떼기 전에 음성인식이 스스로 끝나면(오래 조용함) 그때까지 들은 것 반영
       onDone: finish,
       onError: (m) {
-        onMessage(m);
+        report(m);
         finish();
       },
     );
     if (err != null) {
       listening = false;
       _applied = true;
+      report(err);
       notifyListeners();
-      onMessage(err);
-    } else if (_released) {
+    } else {
+      if (voice.noKorean) {
+        report('폰에 한국어 음성인식이 없어요. 구글 앱 → 설정 → 음성에서 한국어를 받아 주세요');
+      }
       // 시작이 끝나기 전에 이미 손을 뗀 경우
-      await voice.stop();
+      if (_released) await voice.stop();
     }
   }
 
-  /// 손을 떼면 멈추고, 마지막 인식 결과를 잠깐(최대 1.2초) 기다렸다 반영
+  /// 손을 떼면 멈추고, 마지막 인식 결과를 기다렸다(최대 3초) 반영
   void releaseTalk() {
     if (!listening || _released) return;
     _released = true;
     _voice?.stop();
     _releaseTimer?.cancel();
-    _releaseTimer = Timer(
-      const Duration(milliseconds: 1200),
-      () => _finish?.call(),
-    );
+    _releaseTimer = Timer(const Duration(seconds: 3), () => _finish?.call());
   }
 
   /// 말로 한 문장을 금액으로 넣기. 금액이 없으면 false.
