@@ -1,0 +1,131 @@
+name: Flutter APK
+
+on:
+  push:
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter.yml"
+      # 음성 보정 규칙만 바뀐 건 앱이 켜질 때 받아오므로 빌드할 필요 없음
+      - "!flutter_app/voice_rules.json"
+  pull_request:
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter.yml"
+      - "!flutter_app/voice_rules.json"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 검사 + APK 빌드
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+          cache: true
+
+      - name: 패키지 설치
+        run: flutter pub get
+
+      - name: 코드 검사
+        run: flutter analyze
+
+      - name: 테스트
+        run: flutter test
+
+      - name: 서명 열쇠 풀기
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          KS=android/app/upload-keystore.p12
+          if [ -z "$KEYSTORE_B64" ]; then exit 0; fi
+          # 폰에서 붙여넣을 때 끼어드는 공백·줄바꿈 등 base64가 아닌 글자는 걸러낸다
+          CLEAN=$(printf '%s' "$KEYSTORE_B64" | tr -cd 'A-Za-z0-9+/=')
+          echo "받은 열쇠 길이: ${#CLEAN}자 (정상: 3512자)"
+          if ! printf '%s' "$CLEAN" | base64 -d > "$KS" 2>/dev/null; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 값이 깨졌어요 (${#CLEAN}자). 임시 서명으로 빌드합니다."
+            rm -f "$KS"; exit 0
+          fi
+          PW=$(printf '%s' "$KEYSTORE_PW" | tr -d '\r\n')
+          if ! keytool -list -storetype PKCS12 -keystore "$KS" -storepass "$PW" > /dev/null 2>&1; then
+            echo "::warning::열쇠 파일을 열 수 없어요 (값이 잘렸거나 비밀번호가 달라요). 임시 서명으로 빌드합니다."
+            rm -f "$KS"; exit 0
+          fi
+          echo "서명 열쇠 확인 완료"
+          echo "::add-mask::$PW"
+          echo "ANDROID_KEYSTORE_PASSWORD=$PW" >> "$GITHUB_ENV"
+
+      - name: APK 빌드
+        # 위 단계에서 열쇠 확인이 끝나야 ANDROID_KEYSTORE_PASSWORD 가 설정됨.
+        # 없으면 디버그 서명으로 빌드 (build.gradle.kts 참고)
+        run: flutter build apk --release
+
+      - name: 서명 열쇠 지우기
+        if: always()
+        run: rm -f android/app/upload-keystore.p12
+
+      - name: 서명 확인
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::warning::고정 서명이 아니라 임시(디버그) 서명으로 빌드했어요. 덮어 설치가 안 됩니다."
+          fi
+          keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -E "Owner|SHA256" || true
+
+      - name: APK 올리기
+        uses: actions/upload-artifact@v4
+        with:
+          name: vn-currency-flutter-apk-${{ github.run_number }}
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  launch-check:
+    name: 에뮬레이터 실행 점검
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vn-currency-flutter-apk-${{ github.run_number }}
+          path: apk
+
+      - name: KVM 사용 허용
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 앱 설치 후 실행해 보기
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash flutter_app/tool/launch_check.sh apk/app-release.apk
+
+      - name: 점검 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-check-${{ github.run_number }}
+          path: launch-check/
+          if-no-files-found: ignore
+          retention-days: 14
