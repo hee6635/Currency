@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/money.dart';
 import '../state/app_state.dart';
+import 'guide_page.dart';
 import 'theme.dart';
 
 void showRateSheet(BuildContext context) {
@@ -234,6 +235,22 @@ class _RateSheetState extends State<_RateSheet> {
             Text(
               '환전소·카드는 보통 시장 환율보다 1~3% 불리해요. 켜면 결과 아래에 실제로 받을 금액에 가까운 값을 함께 보여줘요.',
               style: muted,
+            ),
+            const SizedBox(height: 18),
+            Divider(color: p.line, height: 1),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.menu_book_rounded, color: p.goldText),
+              title: const Text('사용 설명서'),
+              subtitle: Text('음성 입력 규칙, 더하기 모드 등', style: muted),
+              trailing: Icon(Icons.chevron_right_rounded, color: p.muted),
+              onTap: () {
+                final nav = Navigator.of(context);
+                nav.pop();
+                nav.push(
+                  MaterialPageRoute<void>(builder: (_) => const GuidePage()),
+                );
+              },
             ),
           ],
         ),

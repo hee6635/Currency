@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../core/money.dart';
 import '../state/app_state.dart';
 import 'common.dart';
+import 'guide_page.dart';
 import 'motion.dart';
 import 'rate_sheet.dart';
 import 'theme.dart';
@@ -487,6 +488,11 @@ class _VoicePanel extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
+              IconButton(
+                tooltip: '음성 입력 규칙',
+                onPressed: () => GuidePage.open(context, voiceFirst: true),
+                icon: Icon(Icons.help_outline_rounded, color: p.muted),
+              ),
               IconButton(
                 tooltip: '닫기',
                 onPressed: s.closeVoice,
