@@ -30,6 +30,7 @@ class AppState extends ChangeNotifier {
   bool fetching = false;
   String? fetchError;
   bool autoUpdate = true;
+  bool addMode = true; // 말로 숫자만 연달아 말하면 더하기
   double feePercent = 0; // 환전 수수료 보정 (%)
 
   // 환산
@@ -50,6 +51,7 @@ class AppState extends ChangeNotifier {
     source = RateSource.values[(p.getInt('source') ?? 0).clamp(0, 2)];
     if (rate == null) source = RateSource.none;
     autoUpdate = p.getBool('autoUpdate') ?? true;
+    addMode = p.getBool('addMode') ?? true;
     feePercent = (p.getDouble('fee') ?? 0).clamp(0, 10).toDouble();
     from = p.getString('from') == 'krw' ? Currency.krw : Currency.vnd;
     memo = p.getString('memo') ?? defaultMemo;
@@ -112,6 +114,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setAddMode(bool v) {
+    addMode = v;
+    _prefs?.setBool('addMode', v);
+    notifyListeners();
+  }
+
   void setFee(double v) {
     feePercent = v;
     _prefs?.setDouble('fee', v);
@@ -159,7 +167,8 @@ class AppState extends ChangeNotifier {
       listening = false;
       if (!applied && heard.isNotEmpty) {
         applied = true;
-        if (!applyHeard(heard)) onMessage('"$heard"에서 금액을 못 찾았어요');
+        final msg = applyHeard(heard);
+        if (msg != null) onMessage(msg);
       }
       notifyListeners();
     }
@@ -181,18 +190,34 @@ class AppState extends ChangeNotifier {
   }
 
   /// 말로 한 문장을 금액으로 넣기. 금액이 없으면 false.
-  /// 말한 사칙연산("더하기", "빼기", "곱하기", "나누기")도 수식으로 넣고,
-  /// "얼마"/"결과"라고 했으면 = 를 누른 것처럼 하나로 합친다.
-  bool applyHeard(String text) {
-    final e = parseSpokenExpression(text);
-    if (e == null) return false;
-    if (e.currency != null && e.currency != from) {
-      from = e.currency!;
-      _prefs?.setString('from', from == Currency.krw ? 'krw' : 'vnd');
-    }
-    expr = e.wantsResult ? applyKey(e.expr, '=') : e.expr;
+  /// 말 한 번을 규칙대로 반영하고, 크게 보여줄 확인 화면을 띄운다.
+  /// 반영한 게 없으면 알려줄 말을 돌려준다.
+  String? applyHeard(String text) {
+    final step = applySpoken(expr, text, addMode: addMode);
+    if (!step.changed) return step.message ?? '"$text"을(를) 알아듣지 못했어요';
+    expr = step.expr;
+    _showNotice(step.headline);
     notifyListeners();
-    return true;
+    return step.message;
+  }
+
+  // ---- 말한 내용 확인 화면 (3초 동안 크게) ----
+
+  VoiceNotice? notice;
+  Timer? _noticeTimer;
+  int _noticeId = 0;
+
+  void _showNotice(String headline) {
+    notice = VoiceNotice(++_noticeId, headline);
+    _noticeTimer?.cancel();
+    _noticeTimer = Timer(const Duration(seconds: 3), dismissNotice);
+  }
+
+  void dismissNotice() {
+    _noticeTimer?.cancel();
+    if (notice == null) return;
+    notice = null;
+    notifyListeners();
   }
 
   void swap() {
@@ -263,4 +288,11 @@ class AppState extends ChangeNotifier {
     saveMemoNow();
     super.dispose();
   }
+}
+
+/// 크게 보여줄 확인 내용
+class VoiceNotice {
+  const VoiceNotice(this.id, this.headline);
+  final int id;
+  final String headline;
 }

@@ -14,6 +14,16 @@ class ConvertPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        _convertBody(),
+        // 말로 입력한 뒤 3초 동안 크게 보여주는 확인 화면
+        const Positioned.fill(child: _VoiceNoticeOverlay()),
+      ],
+    );
+  }
+
+  Widget _convertBody() {
     return Column(
       children: [
         // 제목 없이: 왼쪽 환율, 오른쪽 음성 입력
@@ -228,20 +238,40 @@ class _InputCard extends StatelessWidget {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                s.listening ? '' : sub,
-                textAlign: TextAlign.right,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: v == null ? p.danger : p.muted,
-                  fontFeatures: tabular,
+            if (s.listening && s.addMode)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(Icons.add_circle_rounded, size: 15, color: p.gold),
+                    const SizedBox(width: 4),
+                    Text(
+                      '더하기 모드',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: p.goldText,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  s.listening ? '' : sub,
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: v == null ? p.danger : p.muted,
+                    fontFeatures: tabular,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -334,6 +364,130 @@ class _MicButtonState extends State<_MicButton>
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// 말로 입력한 내용을 화면 가운데에 크게 띄웠다가, 3초 뒤 입력 카드 쪽으로
+/// 작아지며 사라진다. 누르면 바로 닫힌다.
+class _VoiceNoticeOverlay extends StatelessWidget {
+  const _VoiceNoticeOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = context.palette;
+    final n = s.notice;
+    final total = s.inputValue;
+    final r = s.resultValue;
+    final summary = n == null
+        ? ''
+        : [
+            if (s.expr.isNotEmpty &&
+                operators.contains(s.expr[s.expr.length - 1]))
+              '${prettyExpr(s.expr)} …'
+            else if (hasOperator(s.expr))
+              '${prettyExpr(s.expr)} = ${total == null ? '—' : fmt(total)}${s.from.unit}'
+            else if (s.expr.isNotEmpty)
+              '${prettyExpr(s.expr)}${s.from.unit}',
+            if (r != null && s.expr.isNotEmpty)
+              '≈ ${fmt(r)}${s.from.other.unit}',
+          ].join('\n');
+
+    return IgnorePointer(
+      ignoring: n == null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: s.dismissNotice,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          color: Colors.black.withValues(alpha: n == null ? 0 : 0.45),
+          alignment: Alignment.center,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 380),
+            reverseDuration: const Duration(milliseconds: 420),
+            transitionBuilder: (child, a) {
+              final entering = child.key == ValueKey(n?.id);
+              if (entering) {
+                // 확대되듯 튀어나옴
+                return FadeTransition(
+                  opacity: a,
+                  child: ScaleTransition(
+                    scale: Tween(
+                      begin: 0.55,
+                      end: 1.0,
+                    ).chain(CurveTween(curve: Curves.easeOutBack)).animate(a),
+                    child: child,
+                  ),
+                );
+              }
+              // 입력 카드 쪽(위)으로 작아지며 들어감
+              return FadeTransition(
+                opacity: a,
+                child: SlideTransition(
+                  position: Tween(
+                    begin: const Offset(0, -1.6),
+                    end: Offset.zero,
+                  ).chain(CurveTween(curve: Curves.easeInCubic)).animate(a),
+                  child: ScaleTransition(
+                    scale: Tween(begin: 0.3, end: 1.0).animate(a),
+                    child: child,
+                  ),
+                ),
+              );
+            },
+            child: n == null
+                ? const SizedBox.shrink(key: ValueKey('none'))
+                : Container(
+                    key: ValueKey(n.id),
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.fromLTRB(28, 24, 28, 22),
+                    decoration: BoxDecoration(
+                      color: p.surface,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: p.gold, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: p.gold.withValues(alpha: 0.35),
+                          blurRadius: 30,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            n.headline,
+                            style: TextStyle(
+                              fontSize: 54,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.5,
+                              color: p.ink,
+                              fontFeatures: tabular,
+                            ),
+                          ),
+                        ),
+                        if (summary.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            summary,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.5,
+                              color: p.muted,
+                              fontFeatures: tabular,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+          ),
         ),
       ),
     );

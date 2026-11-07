@@ -265,20 +265,10 @@ SpokenAmount? parseSpokenAmount(String text) {
   return SpokenAmount(v, cur);
 }
 
-/// 말로 한 계산식 해석 결과
-class SpokenExpr {
-  const SpokenExpr(this.expr, this.currency, {required this.wantsResult});
-
-  /// 키패드 수식 형식 ("200000+50000")
-  final String expr;
-  final Currency? currency;
-
-  /// "얼마", "결과" 같은 말로 = 를 원했는지
-  final bool wantsResult;
-}
-
 final _opWords = RegExp(r'더하기|플러스|빼기|마이너스|곱하기|곱|나누기|[+＋\-−×xX*÷/]');
 final _resultWords = RegExp(r'얼마|결과|이퀄|equals?|=', caseSensitive: false);
+final _clearAll = RegExp(r'다지워|모두지워|전부지워|새로');
+final _deleteOne = RegExp(r'지워|지우기');
 
 String _opFor(String w) {
   if (RegExp(r'더하기|플러스|[+＋]').hasMatch(w)) return opAdd;
@@ -287,34 +277,124 @@ String _opFor(String w) {
   return opDiv;
 }
 
-/// 음성인식 결과를 계산식으로: "이십만 더하기 오만 얼마" → "200000+50000" (결과 원함).
-/// 연산이 없으면 금액 하나. 해석할 수 없으면 null.
-SpokenExpr? parseSpokenExpression(String text) {
+bool _endsWithOp(String e) =>
+    e.isNotEmpty && operators.contains(e[e.length - 1]);
+
+/// 마지막 덩어리(숫자 하나 또는 연산 하나)를 지운다: (남은 식, 지운 것)
+(String, String) removeLastToken(String e) {
+  if (e.isEmpty) return (e, '');
+  if (_endsWithOp(e)) return (e.substring(0, e.length - 1), e[e.length - 1]);
+  final m = RegExp(r'\d+$').firstMatch(e)!;
+  return (e.substring(0, m.start), m.group(0)!);
+}
+
+String _prettyToken(String t) => operators.contains(t) ? t : fmt(int.parse(t));
+
+/// 말 한 번(마이크를 켰다 끈 한 번)의 결과
+class VoiceStep {
+  const VoiceStep(this.expr, this.headline, {this.message});
+
+  /// 바뀐 뒤의 수식
+  final String expr;
+
+  /// 크게 보여줄 말 ("+ 30,000", "5 지움", "= 80,000"). 바뀐 게 없으면 빈 문자열
+  final String headline;
+
+  /// 알려줄 말 (못 알아들음 등)
+  final String? message;
+
+  bool get changed => headline.isNotEmpty;
+}
+
+/// 음성 규칙:
+/// - 말한 숫자는 남아 있고, 이어서 말하면 이어 붙는다 ("오만" → "더하기 삼만").
+/// - 숫자 뒤에 또 숫자만 말하면: 더하기 모드면 더하고, 아니면 안내만.
+/// - "지워": 마지막 덩어리 하나, "다 지워"/"새로": 전부.
+/// - "얼마"/"결과": = 를 누른 것처럼 합친다.
+/// - "원"/"동"은 무시한다 (방향은 화면에서만 바꾼다).
+VoiceStep applySpoken(String expr, String text, {required bool addMode}) {
+  final compact = text.replaceAll(RegExp(r'\s'), '');
+  if (_clearAll.hasMatch(compact)) return const VoiceStep('', '전부 지움');
+
+  // "지워"
+  var e = expr;
+  final removed = <String>[];
+  for (final _ in _deleteOne.allMatches(compact)) {
+    final (rest, tok) = removeLastToken(e);
+    if (tok.isEmpty) break;
+    e = rest;
+    removed.insert(0, tok);
+  }
+  final deleted = removed.isEmpty
+      ? ''
+      : '${removed.map(_prettyToken).join(' ')} 지움';
+
+  // 남은 말: [앞 연산] 숫자 (연산 숫자)* [뒤 연산] [얼마]
   final wantsResult = _resultWords.hasMatch(text);
-  final body = text.replaceAll(_resultWords, ' ');
+  final spoken = text.replaceAll(_deleteOne, ' ').replaceAll(_resultWords, ' ');
   final parts = <String>[];
   final ops = <String>[];
   var last = 0;
-  for (final m in _opWords.allMatches(body)) {
-    parts.add(body.substring(last, m.start));
+  for (final m in _opWords.allMatches(spoken)) {
+    parts.add(spoken.substring(last, m.start));
     ops.add(_opFor(m.group(0)!));
     last = m.end;
   }
-  parts.add(body.substring(last));
+  parts.add(spoken.substring(last));
 
-  final buf = StringBuffer();
-  Currency? cur;
+  String? leadingOp;
+  if (ops.isNotEmpty && parts.first.trim().isEmpty) {
+    leadingOp = ops.removeAt(0);
+    parts.removeAt(0);
+  }
+  final body = StringBuffer();
   for (var i = 0; i < parts.length; i++) {
+    final isLast = i == parts.length - 1;
+    if (isLast && parts[i].trim().isEmpty && i > 0) break; // "오만 더하기"
     final a = parseSpokenAmount(parts[i]);
     if (a == null) {
-      // 맨 끝 숫자가 빠진 "오만 더하기" 같은 경우는 앞부분만 쓴다
-      if (i == parts.length - 1 && i > 0) break;
-      return null;
+      if (parts[i].trim().isEmpty && parts.length == 1) break; // 숫자 없이 연산/얼마만
+      return VoiceStep(expr, '', message: '"$text"에서 금액을 못 찾았어요');
     }
-    cur ??= a.currency;
-    if (a.currency != null) cur = a.currency;
-    if (i > 0) buf.write(ops[i - 1]);
-    buf.write(a.value);
+    if (i > 0) body.write(ops[i - 1]);
+    body.write(a.value);
   }
-  return SpokenExpr(buf.toString(), cur, wantsResult: wantsResult);
+  // 숫자 뒤에 연산으로 끝난 경우 ("오만 더하기")
+  if (parts.length > 1 && parts.last.trim().isEmpty) body.write(ops.last);
+  final b = body.toString();
+
+  String headline;
+  if (b.isEmpty) {
+    if (leadingOp != null && e.isNotEmpty) {
+      e = _endsWithOp(e)
+          ? e.substring(0, e.length - 1) + leadingOp
+          : e + leadingOp;
+      headline = leadingOp;
+    } else {
+      headline = deleted;
+    }
+  } else if (e.isEmpty) {
+    e = b;
+    headline = prettyExpr(b);
+  } else if (_endsWithOp(e)) {
+    if (leadingOp != null) e = e.substring(0, e.length - 1) + leadingOp;
+    headline = '${e[e.length - 1]} ${prettyExpr(b)}';
+    e += b;
+  } else if (leadingOp != null) {
+    e += leadingOp + b;
+    headline = '$leadingOp ${prettyExpr(b)}';
+  } else if (addMode) {
+    e += opAdd + b;
+    headline = '$opAdd ${prettyExpr(b)}';
+  } else {
+    return VoiceStep(expr, deleted, message: '연산을 같이 말해 주세요 (예: 더하기 삼만)');
+  }
+  if (deleted.isNotEmpty && b.isNotEmpty) headline = '$deleted · $headline';
+
+  if (wantsResult && e.isNotEmpty) {
+    e = applyKey(e, '=');
+    headline = e.isEmpty ? '계산할 수 없어요' : '= ${fmt(int.parse(e))}';
+  }
+  if (e.length > 48) return VoiceStep(expr, '', message: '식이 너무 길어요');
+  return VoiceStep(e, headline);
 }

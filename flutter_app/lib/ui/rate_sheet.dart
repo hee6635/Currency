@@ -70,6 +70,8 @@ class _RateSheetState extends State<_RateSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _SectionTitle('환율'),
+            const SizedBox(height: 8),
             Text('현재 환율', style: muted),
             const SizedBox(height: 4),
             Text(
@@ -177,12 +179,25 @@ class _RateSheetState extends State<_RateSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 22),
+            Divider(color: p.line, height: 1),
+            const SizedBox(height: 18),
+            _SectionTitle('설정'),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: s.autoUpdate,
               onChanged: s.setAutoUpdate,
               title: const Text('앱 켤 때 자동 업데이트'),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: s.addMode,
+              onChanged: s.setAddMode,
+              title: const Text('더하기 모드'),
+              subtitle: Text(
+                '말로 입력할 때 숫자만 이어서 말해도 더해요 (오만 → 삼만 = 8만)',
+                style: muted,
+              ),
             ),
             const SizedBox(height: 6),
             Row(
@@ -225,4 +240,19 @@ class _RateSheetState extends State<_RateSheet> {
       ),
     );
   }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w800,
+      color: context.palette.ink,
+    ),
+  );
 }

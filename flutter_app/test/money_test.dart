@@ -132,36 +132,62 @@ void main() {
     });
   });
 
-  group('parseSpokenExpression — 말로 한 사칙연산', () {
-    String? e(String t) => parseSpokenExpression(t)?.expr;
+  group('applySpoken — 음성 규칙', () {
+    VoiceStep say(String e, String t, {bool add = true}) =>
+        applySpoken(e, t, addMode: add);
+
+    test('처음 말한 숫자는 그대로, 이어서 말하면 이어 붙음', () {
+      expect(say('', '오만').expr, '50000');
+      expect(say('50000', '더하기 삼만').expr, '50000+30000');
+      expect(say('50000+', '삼만').expr, '50000+30000');
+      expect(say('', '오만 더하기').expr, '50000+');
+      expect(say('50000', '곱하기').expr, '50000×');
+      expect(say('50000+', '빼기').expr, '50000−');
+    });
 
     test('네 가지 연산', () {
-      expect(e('이십만 더하기 오만'), '200000+50000');
-      expect(e('이십만 플러스 오만'), '200000+50000');
-      expect(e('오십만 빼기 삼만'), '500000−30000');
-      expect(e('오십만 마이너스 삼만'), '500000−30000');
-      expect(e('삼만 곱하기 사'), '30000×4');
-      expect(e('백만 나누기 4'), '1000000÷4');
-      expect(e('27만 + 3만'), '270000+30000');
+      expect(say('', '이십만 더하기 오만').expr, '200000+50000');
+      expect(say('', '오십만 마이너스 삼만').expr, '500000−30000');
+      expect(say('', '삼만 곱하기 사').expr, '30000×4');
+      expect(say('', '백만 나누기 4').expr, '1000000÷4');
     });
 
-    test('"얼마", "결과"는 = 로', () {
-      final r = parseSpokenExpression('이십만 더하기 오만 얼마');
-      expect(r?.expr, '200000+50000');
-      expect(r?.wantsResult, isTrue);
-      expect(parseSpokenExpression('삼만 곱하기 사 결과')?.wantsResult, isTrue);
-      expect(parseSpokenExpression('오만')?.wantsResult, isFalse);
-      expect(applyKey('200000+50000', '='), '250000');
+    test('숫자 뒤에 숫자: 더하기 모드면 더하고, 아니면 안내', () {
+      final on = say('50000', '삼만');
+      expect(on.expr, '50000+30000');
+      expect(on.headline, '+ 30,000');
+      final off = say('50000', '삼만', add: false);
+      expect(off.expr, '50000');
+      expect(off.changed, isFalse);
+      expect(off.message, contains('연산'));
     });
 
-    test('연산 없이 금액만', () {
-      expect(e('이십칠만 동'), '270000');
-      expect(parseSpokenExpression('오만 원')?.currency, Currency.krw);
+    test('지워 / 다 지워', () {
+      expect(say('7+3×10+5', '지워').expr, '7+3×10+');
+      expect(say('7+3×10+5', '지워').headline, '5 지움');
+      expect(say('7+3×10+', '지워').expr, '7+3×10');
+      expect(say('7+3×10', '지워 지워').expr, '7+3');
+      expect(say('7+3×10', '다 지워').expr, '');
+      expect(say('7+3×10', '새로').expr, '');
+      expect(say('50000+30000', '지워 오천').expr, '50000+5000');
     });
 
-    test('끝이 잘린 말은 앞부분만', () {
-      expect(e('오만 더하기'), '50000');
-      expect(parseSpokenExpression('더하기'), isNull);
+    test('얼마 / 결과', () {
+      final r = say('50000+30000', '얼마');
+      expect(r.expr, '80000');
+      expect(r.headline, '= 80,000');
+      expect(say('', '삼만 곱하기 사 결과').expr, '120000');
+    });
+
+    test('원/동은 무시 (방향 안 바꿈)', () {
+      expect(say('', '오만 원').expr, '50000');
+      expect(say('', '이십칠만 동').expr, '270000');
+    });
+
+    test('못 알아들으면 그대로', () {
+      final r = say('50000', '안녕하세요');
+      expect(r.expr, '50000');
+      expect(r.changed, isFalse);
     });
   });
 }

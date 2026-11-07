@@ -94,6 +94,8 @@ class RateChip extends StatelessWidget {
                     fontFeatures: tabular,
                   ),
                 ),
+                const SizedBox(width: 6),
+                Icon(Icons.settings_outlined, size: 16, color: p.muted),
               ],
             ),
           ),
