@@ -225,4 +225,20 @@ void main() {
       expect(say('처음부터', e: '50000'), '');
     });
   });
+
+  test('K(천) 단위: 5K, 오케이, OK, 오십 케이', () {
+    String say(String t) => applySpoken('', t, addMode: true).expr;
+    expect(say('5K'), '5000');
+    expect(say('5k'), '5000');
+    expect(say('50K'), '50000');
+    expect(say('오케이'), '5000');
+    expect(say('오 케이'), '5000');
+    expect(say('OK'), '5000');
+    expect(say('okay'), '5000');
+    expect(say('오십 케이'), '50000');
+    expect(say('이십오 케이'), '25000');
+    expect(say('백 케이'), '100000');
+    expect(say('오만'), '50000');
+    expect(say('오만 더하기 5K'), '50000+5000');
+  });
 }

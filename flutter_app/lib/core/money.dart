@@ -229,7 +229,11 @@ SpokenAmount? parseSpokenAmount(String text) {
               _bigUnits.containsKey(t[i - 1]) ||
               _sinoDigits.containsKey(t[i - 1]));
       final nextIsUnit =
-          _smallUnits.containsKey(next) || _bigUnits.containsKey(next);
+          _smallUnits.containsKey(next) ||
+          _bigUnits.containsKey(next) ||
+          next == '케' ||
+          next == 'k' ||
+          next == 'K';
       if (nextIsUnit || prevIsNum || seen) {
         numVal = _sinoDigits[ch]!.toDouble();
         seen = true;
@@ -237,15 +241,20 @@ SpokenAmount? parseSpokenAmount(String text) {
       i++;
       continue;
     }
-    if (_smallUnits.containsKey(ch) ||
-        ch == 'k' ||
-        ch == 'K' ||
-        t.startsWith('케이', i)) {
-      final unit = _smallUnits[ch] ?? 1000;
-      section += (numVal ?? 1) * unit;
+    // K(천): 앞의 숫자 전체에 곱한다 ("오십 케이" = 50 × 1000, "25K" = 25,000)
+    if (ch == 'k' || ch == 'K' || t.startsWith('케이', i)) {
+      final v = section + (numVal ?? 0);
+      section = (v == 0 ? 1 : v) * 1000;
       numVal = null;
       seen = true;
       i += t.startsWith('케이', i) ? 2 : 1;
+      continue;
+    }
+    if (_smallUnits.containsKey(ch)) {
+      section += (numVal ?? 1) * _smallUnits[ch]!;
+      numVal = null;
+      seen = true;
+      i++;
       continue;
     }
     if (_bigUnits.containsKey(ch)) {
@@ -279,6 +288,8 @@ final List<(RegExp, String)> _fixes = [
   (RegExp(r'나눠\s*(요|줘)?|나누고|나뉘기|나누기|나눗셈'), ' 나누기 '),
   // 결과
   (RegExp(r'얼마\s*(야|지|예요|에요|요)?|계산\s*해?\s*(줘|요)?|결과|합계'), ' 얼마 '),
+  // "오 케이"를 영어 OK로 적는 경우 → 5K
+  (RegExp(r'(^|\s)[Oo]\s*[Kk](?:[Aa][Yy])?(?=\s|$)'), r'$1 5K'),
   // 고유어 숫자 (곱하기 셋 등)
   (RegExp(r'하나'), '1'),
   (RegExp(r'(?<=^|\s)둘(?=\s|$)'), '2'),
