@@ -301,13 +301,13 @@ class AppState extends ChangeNotifier {
         _ev(e);
       },
       onReady: () {
-        _ev('준비');
         voiceReady = true;
         if (!wasReady) HapticFeedback.mediumImpact();
         wasReady = true;
         notifyListeners();
       },
       onText: (cands, isFinal) {
+        if (_candidates.isEmpty && !isFinal) _ev('부분 결과');
         _candidates = cands;
         _updatePreview();
         if (isFinal) _ev('결과');
@@ -356,19 +356,26 @@ class AppState extends ChangeNotifier {
       if (voice.noKorean) {
         report('폰에 한국어 음성인식이 없어요. 구글 앱 → 설정 → 음성에서 한국어를 받아 주세요');
       }
-      // 시작이 끝나기 전에 이미 손을 뗀 경우
-      if (_released) await voice.stop();
+      // 시작이 끝나기 전에 이미 손을 뗐어도 바로 멈추지 않는다 (releaseTalk의 타이머가 멈춤)
     }
   }
 
-  /// 손을 떼면 멈추고, 마지막 인식 결과를 기다렸다(최대 3초) 반영
+  /// 손을 떼도 바로 멈추지 않고 1.2초 더 듣는다 (폰이 마지막 말을 처리할 시간).
+  /// 그다음 멈추고, 최종 결과를 최대 3.5초 기다렸다 반영.
   void releaseTalk() {
     if (!listening || _released) return;
     _released = true;
     _ev('뗌');
-    _voice?.stop();
     _releaseTimer?.cancel();
-    _releaseTimer = Timer(const Duration(seconds: 3), () => _finish?.call());
+    _releaseTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (_applied) return;
+      _ev('멈춤');
+      _voice?.stop();
+      _releaseTimer = Timer(
+        const Duration(milliseconds: 3500),
+        () => _finish?.call(),
+      );
+    });
   }
 
   /// 말로 한 문장을 금액으로 넣기. 금액이 없으면 false.

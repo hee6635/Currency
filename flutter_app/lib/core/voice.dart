@@ -6,6 +6,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 class VoiceInput {
   final _stt = SpeechToText();
   bool _ready = false;
+  bool _audioStarted = false;
   String? _localeId;
 
   /// 폰 음성인식 목록에 한국어가 없음 (구글 앱의 한국어 음성 데이터 필요)
@@ -49,6 +50,7 @@ class VoiceInput {
         _localeId = 'ko_KR';
       }
     }
+    _audioStarted = false;
     await _stt.listen(
       listenOptions: SpeechListenOptions(
         localeId: _localeId ?? 'ko_KR',
@@ -60,6 +62,13 @@ class VoiceInput {
         // 짧은 말(숫자, 계산)에 맞춘 인식 방식
         listenMode: ListenMode.search,
       ),
+      // 마이크로 실제 소리가 들어오기 시작한 순간 = 진짜 준비됨 (진동, "말하세요")
+      onSoundLevelChange: (level) {
+        if (_audioStarted) return;
+        _audioStarted = true;
+        _onEvent?.call('마이크 열림');
+        _onReady?.call();
+      },
       onResult: (SpeechRecognitionResult r) => onText([
         r.recognizedWords,
         for (final a in r.alternates)
@@ -73,7 +82,7 @@ class VoiceInput {
 
   void _status(String status) {
     _onEvent?.call('상태 $status');
-    if (status == SpeechToText.listeningStatus) _onReady?.call();
+    // 'listening'은 듣기 요청 직후 바로 와서 실제 마이크 준비와 다르다 → 준비는 소리 신호로 판단
     // 'notListening'은 손을 떼서 멈춘 순간에도 오고, 최종 결과는 그 뒤에 온다.
     // 끝은 최종 결과까지 전달된 뒤의 'done'으로만 판단한다.
     if (status == SpeechToText.doneStatus) _onDone?.call();
