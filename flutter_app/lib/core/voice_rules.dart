@@ -11,6 +11,8 @@ class VoiceRules {
     this.phrases = const {},
     this.releaseDelayMs = 1200,
     this.finalWaitMs = 3500,
+    this.relistenDelayMs = 600,
+    this.listenMode = 'dictation',
   });
 
   final int version;
@@ -24,6 +26,12 @@ class VoiceRules {
   /// 손 뗀 뒤 더 듣는 시간, 그 뒤 최종 결과 기다리는 시간
   final int releaseDelayMs;
   final int finalWaitMs;
+
+  /// 누르고 있는 중 폰 음성인식이 혼자 끝났을 때 다시 듣기까지 기다리는 시간
+  final int relistenDelayMs;
+
+  /// 'dictation'(받아쓰기) / 'search'(짧은 말) / 'confirmation'
+  final String listenMode;
 
   static const maxFixes = 500;
 
@@ -68,6 +76,12 @@ class VoiceRules {
         phrases: phrases,
         releaseDelayMs: ms('releaseDelayMs', 1200, 0, 5000),
         finalWaitMs: ms('finalWaitMs', 3500, 500, 10000),
+        relistenDelayMs: ms('relistenDelayMs', 600, 100, 3000),
+        listenMode: switch (t is Map ? t['listenMode'] : null) {
+          'search' => 'search',
+          'confirmation' => 'confirmation',
+          _ => 'dictation',
+        },
       );
     } catch (_) {
       return null;

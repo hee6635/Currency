@@ -259,14 +259,31 @@ class AppState extends ChangeNotifier {
         '$prefix $c'.trim(),
     ].where((t) => t.isNotEmpty).toList();
     if (options.isEmpty) return null;
+    // 점수가 가장 높은 후보 (같으면 폰이 준 순서). 숫자로 안 읽히면 제외.
+    String? best;
+    var bestScore = -1 << 30;
     for (final t in options) {
       final step = applySpoken(expr, t, addMode: addMode);
-      if (step.changed && step.message == null) return t;
+      if (!step.changed) continue;
+      var score = 0;
+      if (step.message != null) score -= 50;
+      // "우만"처럼 만·천 앞에 이상한 글자 → 감점
+      score -= 20 * spokenSuspicion(t);
+      // 동은 보통 1,000동 이상: 곱하기·나누기 뒤가 아닌데 1,000 미만이면 감점 ("7" vs "7만")
+      final m = RegExp(r'(\d+)$').firstMatch(step.expr);
+      final before = m == null ? '' : step.expr.substring(0, m.start);
+      final afterMulDiv = before.endsWith(opMul) || before.endsWith(opDiv);
+      if (m != null && !afterMulDiv && !step.headline.startsWith('=')) {
+        final v = int.parse(m.group(1)!);
+        if (from == Currency.vnd && v < 1000) score -= 10;
+        if (from == Currency.krw && v < 10) score -= 10;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = t;
+      }
     }
-    for (final t in options) {
-      if (applySpoken(expr, t, addMode: addMode).changed) return t;
-    }
-    return options.first;
+    return best ?? options.first;
   }
 
   void _updatePreview() {
@@ -284,6 +301,10 @@ class AppState extends ChangeNotifier {
     '$name ${(_clock.elapsedMilliseconds / 1000).toStringAsFixed(1)}',
   );
   bool _restarting = false;
+
+  /// 지난번에 음성인식이 "바쁨"으로 꼬였는지 (다음 누를 때 먼저 정리)
+  bool _busyBefore = false;
+  int _busyRetries = 0;
 
   /// 무전기 방식: 누르는 순간 듣기 시작
   Future<void> pressTalk(void Function(String) onMessage) async {
@@ -360,6 +381,7 @@ class AppState extends ChangeNotifier {
 
     late Future<String?> Function() listen;
     listen = () => voice.start(
+      listenMode: rules.listenMode,
       onEvent: (e) {
         if (e.contains('listening') && !e.contains('notListening')) return;
         _ev(e);
@@ -372,6 +394,13 @@ class AppState extends ChangeNotifier {
       },
       onText: (cands, isFinal) {
         if (_candidates.isEmpty && !isFinal) _ev('부분 결과');
+        // 마지막에 빈 결과가 와도 앞서 들은 걸 지운다 (덮어쓰지 않음)
+        if (cands.every((c) => c.trim().isEmpty)) {
+          if (_candidates.isNotEmpty) {
+            if (isFinal && _released) finish();
+            return;
+          }
+        }
         _candidates = cands;
         _updatePreview();
         if (isFinal) _ev('결과');
@@ -390,10 +419,19 @@ class AppState extends ChangeNotifier {
         final cur = _candidates.isEmpty ? '' : _candidates.first;
         if (cur.isNotEmpty) _segments.add(cur);
         _candidates = const [];
-        Future.delayed(const Duration(milliseconds: 150), () async {
+        Future.delayed(Duration(milliseconds: rules.relistenDelayMs), () async {
           if (_released || _applied) {
             _restarting = false;
             return finish();
+          }
+          if (_busyBefore) {
+            _busyBefore = false;
+            await voice.cancel();
+            await Future<void>.delayed(const Duration(milliseconds: 400));
+            if (_released || _applied) {
+              _restarting = false;
+              return finish();
+            }
           }
           _ev('다시듣기');
           final err = await listen();
@@ -404,12 +442,40 @@ class AppState extends ChangeNotifier {
       onError: (m) {
         // 누르고 있는 중 "못 들음"은 다시 듣기로 넘기고, 나머지 오류만 알림
         if (!_released && m.startsWith('잘 안 들렸어요')) return;
+        // "바쁨"(error_client): 정리하고 잠깐 쉬었다가 최대 2번 다시 시도
+        if (m.startsWith('음성인식이 바빠요')) {
+          _busyBefore = true;
+          // 이미 다시 듣기가 예약돼 있으면 그쪽에서 정리 후 시작
+          if (!_released && _restarting) return;
+          if (!_released && _busyRetries < 2) {
+            _busyRetries++;
+            _restarting = true;
+            Future(() async {
+              await voice.cancel();
+              await Future<void>.delayed(const Duration(milliseconds: 700));
+              _restarting = false;
+              if (_released || _applied) return finish();
+              _ev('다시시도');
+              final err = await listen();
+              if (err != null) finish();
+            });
+            return;
+          }
+        }
         report(m);
         finish();
       },
     );
 
     _finish = finish;
+    _busyRetries = 0;
+    if (_busyBefore) {
+      // 지난번에 꼬였으면 정리하고 잠깐 쉬었다가 시작
+      _busyBefore = false;
+      _ev('정리');
+      await voice.cancel();
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
     final err = await listen();
     if (err != null) {
       listening = false;

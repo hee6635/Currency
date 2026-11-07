@@ -26,4 +26,12 @@ void main() {
     expect(say('오만'), '50000'); // 다른 말은 그대로
     expect(say('이십칠만 동'), '270000');
   });
+
+  test('v3: 음성 기록 55개 반영', () {
+    String say(String t) => applySpoken('', t, addMode: true).expr;
+    expect(say('3탄'), '3000');
+    expect(say('우만동'), '50000');
+    expect(say('젤만'), '70000');
+    expect(say('57,000 /'), '57000');
+  });
 }

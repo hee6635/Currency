@@ -26,6 +26,7 @@ class VoiceInput {
     required void Function(String message) onError,
     void Function()? onReady,
     void Function(String event)? onEvent,
+    String listenMode = 'dictation',
   }) async {
     _onDone = onDone;
     _onReady = onReady;
@@ -59,8 +60,12 @@ class VoiceInput {
         pauseFor: const Duration(seconds: 30),
         partialResults: true,
         cancelOnError: true,
-        // 짧은 말(숫자, 계산)에 맞춘 인식 방식
-        listenMode: ListenMode.search,
+        // 인식 방식은 보정 규칙 파일(timing.listenMode)로 바꿀 수 있음
+        listenMode: switch (listenMode) {
+          'search' => ListenMode.search,
+          'confirmation' => ListenMode.confirmation,
+          _ => ListenMode.dictation,
+        },
       ),
       // 마이크로 실제 소리가 들어오기 시작한 순간 = 진짜 준비됨 (진동, "말하세요")
       onSoundLevelChange: (level) {
@@ -79,6 +84,13 @@ class VoiceInput {
   }
 
   Future<void> stop() => _stt.stop();
+
+  /// 꼬인 음성인식을 정리 (error_client 뒤)
+  Future<void> cancel() async {
+    try {
+      await _stt.cancel();
+    } catch (_) {}
+  }
 
   void _status(String status) {
     _onEvent?.call('상태 $status');

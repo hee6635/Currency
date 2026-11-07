@@ -302,7 +302,12 @@ final List<(RegExp, String)> _fixes = [
   (RegExp(r'아홉'), '9'),
   (RegExp(r'(?<=^|\s)열(?=\s|$)'), '10'),
   // 숫자 단위 오인식: 이촌/이전 → 이천, 오망 → 오만, 심만 → 십만, 빽만 → 백만
-  (RegExp(r'([0-9일이삼사오육칠팔구])\s*(촌|전|쳔|철)'), r'$1천'),
+  (RegExp(r'([0-9일이삼사오육칠팔구])\s*(촌|전|쳔|철|탄|턴|청|첨)'), r'$1천'),
+  // 만·천 앞 비슷한 소리: 우만 → 오만, 젤만 → 칠만
+  (RegExp(r'(^|\s)(우|어)(?=\s*[만천백])'), r'$1오'),
+  (RegExp(r'(^|\s)(젤|첼|치|질)(?=\s*만)'), r'$1칠'),
+  // 음성인식이 끝에 붙인 연산 기호(말로 한 "더하기"가 아니라 기호만) → 잡음으로 버림
+  (RegExp(r'\s*[+\-−×xX*÷/]\s*$'), ' '),
   (RegExp(r'([0-9일이삼사오육칠팔구십백천])\s*망'), r'$1만'),
   (RegExp(r'(^|[\s이삼사오육칠팔구])(심|쉽)(?=[\s일이삼사오육칠팔구만천백]|$)'), r'$1십'),
   (RegExp(r'빽|벡'), '백'),
@@ -318,6 +323,16 @@ final List<(RegExp, String)> _fixes = [
 List<(RegExp, String)> spokenExtraFixes = [];
 Map<String, String> spokenPhrases = {};
 
+/// 수상한 정도: 만·천·백·십 바로 앞에 숫자가 아닌 글자가 붙은 경우의 수
+/// (예: "우만" → 1). 후보를 고를 때 낮은 쪽을 고른다.
+int spokenSuspicion(String text) {
+  final t = normalizeSpoken(text);
+  return RegExp(r'([가-힣])(?=[만천백십])')
+      .allMatches(t)
+      .where((m) => !'일이삼사오육칠팔구십백천만억'.contains(m.group(1)!))
+      .length;
+}
+
 /// 음성인식 결과를 계산하기 좋게 다듬기
 String normalizeSpoken(String text) {
   var t = ' $text ';
@@ -328,8 +343,19 @@ String normalizeSpoken(String text) {
     final keys = spokenPhrases.keys.toList()
       ..sort((a, b) => b.length.compareTo(a.length));
     for (final k in keys) {
-      if (k.isNotEmpty && c.contains(k)) {
-        c = c.replaceAll(k, ' ${spokenPhrases[k]} ');
+      if (k.isEmpty) continue;
+      // 숫자만 있는 말("7")은 통째로 같을 때만 (70의 7까지 바꾸지 않게)
+      if (RegExp(r'^[0-9.,]+$').hasMatch(k)) {
+        if (c == k) {
+          c = ' ${spokenPhrases[k]} ';
+          hit = true;
+        }
+        continue;
+      }
+      // 나머지는 앞뒤가 숫자가 아닐 때만
+      final re = RegExp('(?<![0-9])${RegExp.escape(k)}(?![0-9])');
+      if (re.hasMatch(c)) {
+        c = c.replaceAll(re, ' ${spokenPhrases[k]} ');
         hit = true;
       }
     }

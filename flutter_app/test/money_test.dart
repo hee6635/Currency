@@ -241,4 +241,32 @@ void main() {
     expect(say('오만'), '50000');
     expect(say('오만 더하기 5K'), '50000+5000');
   });
+
+  group('음성 기록 55개에서 나온 오인식', () {
+    String say(String t, {String e = ''}) =>
+        applySpoken(e, t, addMode: true).expr;
+    tearDown(() => spokenPhrases = {});
+
+    test('비슷한 소리', () {
+      expect(say('3탄'), '3000');
+      expect(say('삼탄'), '3000');
+      expect(say('우만동'), '50000');
+      expect(say('젤만'), '70000');
+      expect(say('57,000 /'), '57000'); // 끝에 붙은 기호는 잡음
+      expect(say('오만 더하기'), '50000+'); // 말로 한 연산은 유지
+    });
+
+    test('가르친 숫자 말은 통째로만 바꿈', () {
+      spokenPhrases = {'7': '70000', '이촌동': '2000'};
+      expect(say('7'), '70000');
+      expect(say('70'), '70'); // 70의 7은 그대로
+      expect(say('이촌동'), '2000');
+    });
+
+    test('수상한 글자 점수', () {
+      expect(spokenSuspicion('뭐만'), greaterThan(0));
+      expect(spokenSuspicion('오만'), 0);
+      expect(spokenSuspicion('7만'), 0);
+    });
+  });
 }
