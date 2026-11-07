@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/money.dart';
 import '../core/rate_service.dart';
+import '../core/voice.dart';
 
 enum RateSource { none, api, manual }
 
@@ -130,6 +131,64 @@ class AppState extends ChangeNotifier {
     final digits = parsePasted(text);
     if (digits == null) return false;
     expr = digits;
+    notifyListeners();
+    return true;
+  }
+
+  // ---- 음성 입력 ----
+
+  VoiceInput? _voice;
+  bool listening = false;
+  String heard = '';
+
+  /// 마이크 버튼: 듣는 중이면 멈추고, 아니면 듣기 시작.
+  /// 끝나면 말한 금액을 입력하고, "원"/"동"이라고 했으면 방향도 맞춘다.
+  /// 알려줄 말(오류, 못 알아들음)은 [onMessage]로.
+  Future<void> toggleVoice(void Function(String) onMessage) async {
+    final voice = _voice ??= VoiceInput();
+    if (listening) {
+      await voice.stop();
+      return;
+    }
+    listening = true;
+    heard = '';
+    notifyListeners();
+    var applied = false;
+    void finish() {
+      if (!listening) return;
+      listening = false;
+      if (!applied && heard.isNotEmpty) {
+        applied = true;
+        if (!applyHeard(heard)) onMessage('"$heard"에서 금액을 못 찾았어요');
+      }
+      notifyListeners();
+    }
+
+    final err = await voice.start(
+      onText: (text, isFinal) {
+        heard = text;
+        notifyListeners();
+        if (isFinal) finish();
+      },
+      onDone: finish,
+      onError: onMessage,
+    );
+    if (err != null) {
+      listening = false;
+      notifyListeners();
+      onMessage(err);
+    }
+  }
+
+  /// 말로 한 문장을 금액으로 넣기. 금액이 없으면 false.
+  bool applyHeard(String text) {
+    final a = parseSpokenAmount(text);
+    if (a == null) return false;
+    if (a.currency != null && a.currency != from) {
+      from = a.currency!;
+      _prefs?.setString('from', from == Currency.krw ? 'krw' : 'vnd');
+    }
+    expr = a.value.toString();
     notifyListeners();
     return true;
   }

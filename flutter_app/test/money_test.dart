@@ -96,4 +96,39 @@ void main() {
       expect(parseRate('18,45'), 18.45);
     });
   });
+
+  group('parseSpokenAmount — 음성으로 말한 금액', () {
+    int? v(String t) => parseSpokenAmount(t)?.value;
+    Currency? c(String t) => parseSpokenAmount(t)?.currency;
+
+    test('한글 숫자', () {
+      expect(v('이십칠만 동'), 270000);
+      expect(v('오만'), 50000);
+      expect(v('만 오천'), 15000);
+      expect(v('삼백오십만'), 3500000);
+      expect(v('천오백'), 1500);
+      expect(v('이억 삼천만'), 230000000);
+      expect(v('십오만 원'), 150000);
+    });
+
+    test('아라비아 숫자와 섞인 말', () {
+      expect(v('27만 동'), 270000);
+      expect(v('27만 5천'), 275000);
+      expect(v('270,000동'), 270000);
+      expect(v('2.5만'), 25000);
+      expect(v('50K'), 50000);
+      expect(v('50케이'), 50000);
+    });
+
+    test('통화 알아듣기', () {
+      expect(c('이십칠만 동'), Currency.vnd);
+      expect(c('오만 원'), Currency.krw);
+      expect(c('27만'), isNull);
+    });
+
+    test('숫자가 없으면 null', () {
+      expect(parseSpokenAmount('안녕하세요'), isNull);
+      expect(parseSpokenAmount(''), isNull);
+    });
+  });
 }

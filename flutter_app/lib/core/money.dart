@@ -153,3 +153,106 @@ double? parseRate(String text) {
   if (v == null || v.isNaN || v <= 0 || v > 10000) return null;
   return v;
 }
+
+/// 말로 한 금액 해석 결과
+class SpokenAmount {
+  const SpokenAmount(this.value, this.currency);
+  final int value;
+
+  /// "동"/"원"을 말했으면 그 통화, 아니면 null
+  final Currency? currency;
+}
+
+const _sinoDigits = {
+  '영': 0,
+  '공': 0,
+  '일': 1,
+  '이': 2,
+  '삼': 3,
+  '사': 4,
+  '오': 5,
+  '육': 6,
+  '륙': 6,
+  '칠': 7,
+  '팔': 8,
+  '구': 9,
+};
+const _smallUnits = {'십': 10, '백': 100, '천': 1000};
+const _bigUnits = {'만': 10000, '억': 100000000};
+
+/// 음성인식 결과를 금액으로: "이십칠만 동" → 270000(동), "27만 5천원" → 275000(원),
+/// "오만" → 50000, "50K" → 50000, "270,000동" → 270000. 숫자가 없으면 null.
+SpokenAmount? parseSpokenAmount(String text) {
+  final t = text.replaceAll(RegExp(r'[\s,]'), '');
+  if (t.isEmpty) return null;
+
+  Currency? cur;
+  if (RegExp(r'동|đồng|dong|VND', caseSensitive: false).hasMatch(t)) {
+    cur = Currency.vnd;
+  }
+  if (RegExp(r'원|won|KRW', caseSensitive: false).hasMatch(t)) {
+    // 둘 다 나오면 마지막에 말한 쪽
+    final iw = t.lastIndexOf(RegExp(r'원|won|KRW', caseSensitive: false));
+    final id = t.lastIndexOf(RegExp(r'동|đồng|dong|VND', caseSensitive: false));
+    cur = iw > id ? Currency.krw : Currency.vnd;
+  }
+
+  double total = 0; // 만/억으로 묶인 부분
+  double section = 0; // 만 아래 부분
+  double? numVal; // 방금 읽은 숫자
+  var seen = false;
+
+  var i = 0;
+  while (i < t.length) {
+    final ch = t[i];
+    final m = RegExp(r'^\d+(\.\d+)?').firstMatch(t.substring(i));
+    if (m != null) {
+      numVal = double.parse(m.group(0)!);
+      seen = true;
+      i += m.group(0)!.length;
+      continue;
+    }
+    if (_sinoDigits.containsKey(ch)) {
+      // "이" 같은 글자가 조사로 쓰일 수 있어서, 숫자 단위 앞뒤에 있을 때만 숫자로 본다
+      final next = i + 1 < t.length ? t[i + 1] : '';
+      final prevIsNum =
+          i > 0 &&
+          (_smallUnits.containsKey(t[i - 1]) ||
+              _bigUnits.containsKey(t[i - 1]) ||
+              _sinoDigits.containsKey(t[i - 1]));
+      final nextIsUnit =
+          _smallUnits.containsKey(next) || _bigUnits.containsKey(next);
+      if (nextIsUnit || prevIsNum || seen) {
+        numVal = _sinoDigits[ch]!.toDouble();
+        seen = true;
+      }
+      i++;
+      continue;
+    }
+    if (_smallUnits.containsKey(ch) ||
+        ch == 'k' ||
+        ch == 'K' ||
+        t.startsWith('케이', i)) {
+      final unit = _smallUnits[ch] ?? 1000;
+      section += (numVal ?? 1) * unit;
+      numVal = null;
+      seen = true;
+      i += t.startsWith('케이', i) ? 2 : 1;
+      continue;
+    }
+    if (_bigUnits.containsKey(ch)) {
+      section += numVal ?? 0;
+      total += (section == 0 ? 1 : section) * _bigUnits[ch]!;
+      section = 0;
+      numVal = null;
+      seen = true;
+      i++;
+      continue;
+    }
+    i++; // 동, 원, 조사 등은 건너뜀
+  }
+  if (!seen) return null;
+  final v = (total + section + (numVal ?? 0)).round();
+  if (v <= 0 || v.toString().length > 12) return null;
+  return SpokenAmount(v, cur);
+}

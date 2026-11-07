@@ -215,19 +215,27 @@ class Panel extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(18),
+    this.glow,
   });
   final Widget child;
   final EdgeInsets padding;
 
+  /// 지정하면 테두리를 그 색으로 빛나게 (음성 듣는 중 등)
+  final Color? glow;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
       padding: padding,
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: p.line),
+        border: Border.all(color: glow ?? p.line, width: glow == null ? 1 : 2),
+        boxShadow: glow == null
+            ? null
+            : [BoxShadow(color: glow!.withValues(alpha: 0.35), blurRadius: 18)],
       ),
       child: child,
     );

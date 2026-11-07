@@ -16,7 +16,11 @@ class ConvertPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const PageHeader(title: '환율 계산'),
+        // 제목 없이: 왼쪽 환율, 오른쪽 음성 입력
+        const Padding(
+          padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: Row(children: [RateChip(), Spacer(), _MicButton()]),
+        ),
         Expanded(
           child: LayoutBuilder(
             builder: (context, box) {
@@ -155,6 +159,7 @@ class _InputCard extends StatelessWidget {
 
     return Panel(
       padding: const EdgeInsets.fromLTRB(18, 10, 10, 12),
+      glow: s.listening ? p.gold : null,
       child: _SwapSlide(
         value: s.from,
         fromBelow: false,
@@ -164,20 +169,27 @@ class _InputCard extends StatelessWidget {
             _CardLabel(
               s.from,
               onNavy: false,
-              trailing: IconButton(
-                tooltip: '금액 붙여넣기',
-                visualDensity: VisualDensity.compact,
-                icon: Icon(
-                  Icons.content_paste_rounded,
-                  size: 20,
-                  color: p.muted,
-                ),
-                onPressed: () async {
-                  final data = await Clipboard.getData(Clipboard.kTextPlain);
-                  if (!context.mounted) return;
-                  final ok = s.pasteAmount(data?.text ?? '');
-                  if (!ok) toast(context, '복사한 내용에 금액이 없어요');
-                },
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: '금액 붙여넣기',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.content_paste_rounded,
+                      size: 20,
+                      color: p.muted,
+                    ),
+                    onPressed: () async {
+                      final data = await Clipboard.getData(
+                        Clipboard.kTextPlain,
+                      );
+                      if (!context.mounted) return;
+                      final ok = s.pasteAmount(data?.text ?? '');
+                      if (!ok) toast(context, '복사한 내용에 금액이 없어요');
+                    },
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -187,19 +199,31 @@ class _InputCard extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: AnimatedNumberText(
-                      prettyExpr(s.expr),
-                      cursorColor: p.gold,
-                      style: TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.8,
-                        color: s.expr.isEmpty
-                            ? p.muted.withValues(alpha: 0.6)
-                            : p.ink,
-                        fontFeatures: tabular,
-                      ),
-                    ),
+                    child: s.listening
+                        // 듣는 중: 들리는 말을 그대로 보여준다
+                        ? Text(
+                            s.heard.isEmpty
+                                ? '"이십칠만 동"처럼 말해 보세요'
+                                : '${s.heard}…',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w600,
+                              color: s.heard.isEmpty ? p.muted : p.ink,
+                            ),
+                          )
+                        : AnimatedNumberText(
+                            prettyExpr(s.expr),
+                            cursorColor: p.gold,
+                            style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.8,
+                              color: s.expr.isEmpty
+                                  ? p.muted.withValues(alpha: 0.6)
+                                  : p.ink,
+                              fontFeatures: tabular,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -207,7 +231,7 @@ class _InputCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Text(
-                sub,
+                s.listening ? '' : sub,
                 textAlign: TextAlign.right,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -219,6 +243,97 @@ class _InputCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 마이크 버튼: 듣는 중에는 금색으로 채워지고 둘레가 숨 쉬듯 퍼진다.
+class _MicButton extends StatefulWidget {
+  const _MicButton();
+
+  @override
+  State<_MicButton> createState() => _MicButtonState();
+}
+
+class _MicButtonState extends State<_MicButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = context.palette;
+    if (s.listening && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!s.listening && _pulse.isAnimating) {
+      _pulse.stop();
+      _pulse.value = 0;
+    }
+    return Semantics(
+      button: true,
+      label: s.listening ? '음성 입력 멈추기' : '말로 금액 입력하기',
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          s.toggleVoice((m) => toast(context, m));
+        },
+        child: AnimatedBuilder(
+          animation: _pulse,
+          builder: (context, _) {
+            final t = Curves.easeInOut.transform(_pulse.value);
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              height: 44,
+              padding: const EdgeInsets.fromLTRB(12, 0, 16, 0),
+              decoration: BoxDecoration(
+                color: s.listening ? p.gold : p.surface,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: s.listening ? p.gold : p.line),
+                boxShadow: s.listening
+                    ? [
+                        // 듣는 중: 둘레가 숨 쉬듯 퍼진다
+                        BoxShadow(
+                          color: p.gold.withValues(alpha: 0.45 * (1 - t) + 0.1),
+                          blurRadius: 6 + 14 * t,
+                          spreadRadius: 1 + 4 * t,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    s.listening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    size: 22,
+                    color: s.listening ? p.navy : p.ink,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    s.listening ? '듣는 중' : '말로 입력',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: s.listening ? p.navy : p.ink,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
