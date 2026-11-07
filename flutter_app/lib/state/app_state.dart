@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/money.dart';
@@ -146,47 +147,97 @@ class AppState extends ChangeNotifier {
   // ---- 음성 입력 ----
 
   VoiceInput? _voice;
-  bool listening = false;
-  String heard = '';
 
-  /// 마이크 버튼: 듣는 중이면 멈추고, 아니면 듣기 시작.
-  /// 끝나면 말한 금액을 입력하고, "원"/"동"이라고 했으면 방향도 맞춘다.
-  /// 알려줄 말(오류, 못 알아들음)은 [onMessage]로.
-  Future<void> toggleVoice(void Function(String) onMessage) async {
-    final voice = _voice ??= VoiceInput();
-    if (listening) {
-      await voice.stop();
-      return;
-    }
-    listening = true;
-    heard = '';
+  /// 음성 모드(네모 창)가 열려 있는지
+  bool voiceMode = false;
+
+  /// 버튼을 누르고 있는 동안 true
+  bool listening = false;
+
+  /// 음성인식이 실제로 듣기 시작했는지 (이때 진동, "말하세요")
+  bool voiceReady = false;
+  String heard = '';
+  bool _released = false;
+  bool _applied = false;
+  Timer? _releaseTimer;
+  void Function()? _finish;
+
+  void openVoice() {
+    voiceMode = true;
+    notice = null;
     notifyListeners();
-    var applied = false;
+  }
+
+  void closeVoice() {
+    if (listening) releaseTalk();
+    voiceMode = false;
+    notifyListeners();
+  }
+
+  /// 무전기 방식: 누르는 순간 듣기 시작
+  Future<void> pressTalk(void Function(String) onMessage) async {
+    if (listening) return;
+    final voice = _voice ??= VoiceInput();
+    listening = true;
+    voiceReady = false;
+    heard = '';
+    _released = false;
+    _applied = false;
+    notifyListeners();
+
     void finish() {
-      if (!listening) return;
+      if (_applied) return;
+      _applied = true;
+      _releaseTimer?.cancel();
       listening = false;
-      if (!applied && heard.isNotEmpty) {
-        applied = true;
+      voiceReady = false;
+      if (heard.isNotEmpty) {
         final msg = applyHeard(heard);
         if (msg != null) onMessage(msg);
       }
       notifyListeners();
     }
 
+    _finish = finish;
     final err = await voice.start(
+      onReady: () {
+        voiceReady = true;
+        HapticFeedback.mediumImpact();
+        notifyListeners();
+      },
       onText: (text, isFinal) {
         heard = text;
         notifyListeners();
-        if (isFinal) finish();
+        if (isFinal && _released) finish();
       },
+      // 손을 떼기 전에 음성인식이 스스로 끝나면(오래 조용함) 그때까지 들은 것 반영
       onDone: finish,
-      onError: onMessage,
+      onError: (m) {
+        onMessage(m);
+        finish();
+      },
     );
     if (err != null) {
       listening = false;
+      _applied = true;
       notifyListeners();
       onMessage(err);
+    } else if (_released) {
+      // 시작이 끝나기 전에 이미 손을 뗀 경우
+      await voice.stop();
     }
+  }
+
+  /// 손을 떼면 멈추고, 마지막 인식 결과를 잠깐(최대 1.2초) 기다렸다 반영
+  void releaseTalk() {
+    if (!listening || _released) return;
+    _released = true;
+    _voice?.stop();
+    _releaseTimer?.cancel();
+    _releaseTimer = Timer(
+      const Duration(milliseconds: 1200),
+      () => _finish?.call(),
+    );
   }
 
   /// 말로 한 문장을 금액으로 넣기. 금액이 없으면 false.
@@ -201,20 +252,16 @@ class AppState extends ChangeNotifier {
     return step.message;
   }
 
-  // ---- 말한 내용 확인 화면 (3초 동안 크게) ----
+  // ---- 음성 모드 창에 크게 보여줄 마지막 내용 ----
 
   VoiceNotice? notice;
-  Timer? _noticeTimer;
   int _noticeId = 0;
 
   void _showNotice(String headline) {
     notice = VoiceNotice(++_noticeId, headline);
-    _noticeTimer?.cancel();
-    _noticeTimer = Timer(const Duration(seconds: 3), dismissNotice);
   }
 
   void dismissNotice() {
-    _noticeTimer?.cancel();
     if (notice == null) return;
     notice = null;
     notifyListeners();

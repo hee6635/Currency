@@ -7,6 +7,7 @@ class VoiceInput {
   final _stt = SpeechToText();
   bool _ready = false;
   void Function()? _onDone;
+  void Function()? _onReady;
   void Function(String)? _onError;
 
   bool get isListening => _stt.isListening;
@@ -16,8 +17,10 @@ class VoiceInput {
     required void Function(String text, bool isFinal) onText,
     required void Function() onDone,
     required void Function(String message) onError,
+    void Function()? onReady,
   }) async {
     _onDone = onDone;
+    _onReady = onReady;
     _onError = onError;
     if (!_ready) {
       try {
@@ -30,8 +33,9 @@ class VoiceInput {
     await _stt.listen(
       listenOptions: SpeechListenOptions(
         localeId: 'ko_KR',
-        listenFor: const Duration(seconds: 12),
-        pauseFor: const Duration(seconds: 2),
+        // 무전기 방식: 버튼을 떼면 멈추므로 넉넉하게
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 30),
         partialResults: true,
         cancelOnError: true,
         listenMode: ListenMode.dictation,
@@ -45,6 +49,7 @@ class VoiceInput {
   Future<void> stop() => _stt.stop();
 
   void _status(String status) {
+    if (status == SpeechToText.listeningStatus) _onReady?.call();
     if (status == SpeechToText.doneStatus ||
         status == SpeechToText.notListeningStatus) {
       _onDone?.call();

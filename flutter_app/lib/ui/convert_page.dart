@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/money.dart';
+import '../state/app_state.dart';
 import 'common.dart';
 import 'motion.dart';
 import 'rate_sheet.dart';
@@ -18,7 +19,8 @@ class ConvertPage extends StatelessWidget {
       children: [
         _convertBody(),
         // 말로 입력한 뒤 3초 동안 크게 보여주는 확인 화면
-        const Positioned.fill(child: _VoiceNoticeOverlay()),
+        // 음성 모드: 네모 창이 떠 있고, 버튼을 누르고 있는 동안만 듣는다
+        const Positioned.fill(child: _VoicePanel()),
       ],
     );
   }
@@ -304,21 +306,21 @@ class _MicButtonState extends State<_MicButton>
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final p = context.palette;
-    if (s.listening && !_pulse.isAnimating) {
+    if (s.voiceMode && !_pulse.isAnimating) {
       _pulse.repeat(reverse: true);
-    } else if (!s.listening && _pulse.isAnimating) {
+    } else if (!s.voiceMode && _pulse.isAnimating) {
       _pulse.stop();
       _pulse.value = 0;
     }
     return Semantics(
       button: true,
-      label: s.listening ? '음성 입력 멈추기' : '말로 금액 입력하기',
+      label: s.voiceMode ? '음성 입력 멈추기' : '말로 금액 입력하기',
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
           HapticFeedback.mediumImpact();
-          s.toggleVoice((m) => toast(context, m));
+          s.voiceMode ? s.closeVoice() : s.openVoice();
         },
         child: AnimatedBuilder(
           animation: _pulse,
@@ -329,10 +331,10 @@ class _MicButtonState extends State<_MicButton>
               height: 44,
               padding: const EdgeInsets.fromLTRB(12, 0, 16, 0),
               decoration: BoxDecoration(
-                color: s.listening ? p.gold : p.surface,
+                color: s.voiceMode ? p.gold : p.surface,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: s.listening ? p.gold : p.line),
-                boxShadow: s.listening
+                border: Border.all(color: s.voiceMode ? p.gold : p.line),
+                boxShadow: s.voiceMode
                     ? [
                         // 듣는 중: 둘레가 숨 쉬듯 퍼진다
                         BoxShadow(
@@ -347,17 +349,17 @@ class _MicButtonState extends State<_MicButton>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    s.listening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    s.voiceMode ? Icons.mic_rounded : Icons.mic_none_rounded,
                     size: 22,
-                    color: s.listening ? p.navy : p.ink,
+                    color: s.voiceMode ? p.navy : p.ink,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    s.listening ? '듣는 중' : '말로 입력',
+                    s.voiceMode ? '음성 모드' : '말로 입력',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: s.listening ? p.navy : p.ink,
+                      color: s.voiceMode ? p.navy : p.ink,
                     ),
                   ),
                 ],
@@ -370,124 +372,288 @@ class _MicButtonState extends State<_MicButton>
   }
 }
 
-/// 말로 입력한 내용을 화면 가운데에 크게 띄웠다가, 3초 뒤 입력 카드 쪽으로
-/// 작아지며 사라진다. 누르면 바로 닫힌다.
-class _VoiceNoticeOverlay extends StatelessWidget {
-  const _VoiceNoticeOverlay();
+/// 음성 모드 창 (무전기 방식).
+/// 가운데 네모 창에 지금까지의 식과 합계가 크게 보이고,
+/// 아래 큰 버튼을 누르고 있는 동안만 듣는다. 떼면 반영.
+class _VoicePanel extends StatelessWidget {
+  const _VoicePanel();
 
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final p = context.palette;
-    final n = s.notice;
+    final open = s.voiceMode;
+    return IgnorePointer(
+      ignoring: !open,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: open ? 1 : 0,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: s.closeVoice, // 바깥 누르면 닫힘
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.55),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              scale: open ? 1 : 0.85,
+              child: GestureDetector(
+                onTap: () {}, // 창 안쪽은 닫히지 않게
+                child: _panelCard(context, s, p),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _panelCard(BuildContext context, AppState s, Palette p) {
     final total = s.inputValue;
     final r = s.resultValue;
-    final summary = n == null
+    final endsWithOp =
+        s.expr.isNotEmpty && operators.contains(s.expr[s.expr.length - 1]);
+    final exprLine = s.expr.isEmpty
         ? ''
-        : [
-            if (s.expr.isNotEmpty &&
-                operators.contains(s.expr[s.expr.length - 1]))
-              '${prettyExpr(s.expr)} …'
-            else if (hasOperator(s.expr))
-              '${prettyExpr(s.expr)} = ${total == null ? '—' : fmt(total)}${s.from.unit}'
-            else if (s.expr.isNotEmpty)
-              '${prettyExpr(s.expr)}${s.from.unit}',
-            if (r != null && s.expr.isNotEmpty)
-              '≈ ${fmt(r)}${s.from.other.unit}',
-          ].join('\n');
+        : endsWithOp
+        ? '${prettyExpr(s.expr)} …'
+        : hasOperator(s.expr)
+        ? '${prettyExpr(s.expr)} = ${total == null ? '—' : fmt(total)}${s.from.unit}'
+        : '${prettyExpr(s.expr)}${s.from.unit}';
 
-    return IgnorePointer(
-      ignoring: n == null,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: s.dismissNotice,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          color: Colors.black.withValues(alpha: n == null ? 0 : 0.45),
-          alignment: Alignment.center,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 380),
-            reverseDuration: const Duration(milliseconds: 420),
-            transitionBuilder: (child, a) {
-              final entering = child.key == ValueKey(n?.id);
-              if (entering) {
-                // 확대되듯 튀어나옴
-                return FadeTransition(
+    // 가운데 큰 글자: 듣는 중이면 들리는 말, 아니면 마지막으로 반영한 내용
+    final String big;
+    final bool bigMuted;
+    if (s.listening) {
+      big = s.heard.isNotEmpty
+          ? '${s.heard}…'
+          : (s.voiceReady ? '말하세요' : '준비 중…');
+      bigMuted = s.heard.isEmpty;
+    } else if (s.notice != null) {
+      big = s.notice!.headline;
+      bigMuted = false;
+    } else {
+      big = '버튼을 누른 채로 말하세요';
+      bigMuted = true;
+    }
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 440),
+      padding: const EdgeInsets.fromLTRB(20, 12, 12, 22),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: s.listening ? p.gold : p.line, width: 2),
+        boxShadow: [
+          if (s.listening)
+            BoxShadow(color: p.gold.withValues(alpha: 0.35), blurRadius: 30),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              FlagIcon(s.from, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                '${s.from.name}으로 계산',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: p.ink,
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (s.addMode)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: p.gold.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '+ 더하기 모드',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: p.goldText,
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              IconButton(
+                tooltip: '닫기',
+                onPressed: s.closeVoice,
+                icon: Icon(Icons.close_rounded, color: p.muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // 큰 글자: 바뀔 때마다 확대되듯 튀어나온다
+          SizedBox(
+            height: 72,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                transitionBuilder: (child, a) => FadeTransition(
                   opacity: a,
                   child: ScaleTransition(
                     scale: Tween(
-                      begin: 0.55,
+                      begin: 0.6,
                       end: 1.0,
                     ).chain(CurveTween(curve: Curves.easeOutBack)).animate(a),
                     child: child,
                   ),
-                );
-              }
-              // 입력 카드 쪽(위)으로 작아지며 들어감
-              return FadeTransition(
-                opacity: a,
-                child: SlideTransition(
-                  position: Tween(
-                    begin: const Offset(0, -1.6),
-                    end: Offset.zero,
-                  ).chain(CurveTween(curve: Curves.easeInCubic)).animate(a),
-                  child: ScaleTransition(
-                    scale: Tween(begin: 0.3, end: 1.0).animate(a),
-                    child: child,
+                ),
+                child: FittedBox(
+                  key: ValueKey(
+                    '${s.listening}|${s.listening ? '' : s.notice?.id}',
+                  ),
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    big,
+                    style: TextStyle(
+                      fontSize: bigMuted ? 26 : 50,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: bigMuted ? -0.5 : -1.5,
+                      color: bigMuted ? p.muted : p.ink,
+                      fontFeatures: tabular,
+                    ),
                   ),
                 ),
-              );
-            },
-            child: n == null
-                ? const SizedBox.shrink(key: ValueKey('none'))
-                : Container(
-                    key: ValueKey(n.id),
-                    margin: const EdgeInsets.symmetric(horizontal: 24),
-                    padding: const EdgeInsets.fromLTRB(28, 24, 28, 22),
-                    decoration: BoxDecoration(
-                      color: p.surface,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: p.gold, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: p.gold.withValues(alpha: 0.35),
-                          blurRadius: 30,
-                        ),
-                      ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            [
+              if (exprLine.isNotEmpty) exprLine,
+              if (r != null && s.expr.isNotEmpty && !endsWithOp)
+                '≈ ${fmt(r)}${s.from.other.unit}',
+            ].join('\n'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: p.muted,
+              fontFeatures: tabular,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const _TalkButton(),
+          const SizedBox(height: 12),
+          Text(
+            s.listening
+                ? (s.voiceReady ? '듣는 중 · 손을 떼면 입력돼요' : '진동이 오면 말하세요')
+                : '누르고 있는 동안 들어요 · "지워", "얼마"도 돼요',
+            style: TextStyle(
+              fontSize: 13,
+              color: s.listening ? p.goldText : p.muted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 누르고 있는 동안만 듣는 큰 버튼. 듣는 동안 둘레가 숨 쉬듯 퍼진다.
+class _TalkButton extends StatefulWidget {
+  const _TalkButton();
+
+  @override
+  State<_TalkButton> createState() => _TalkButtonState();
+}
+
+class _TalkButtonState extends State<_TalkButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = context.palette;
+    if (s.listening && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!s.listening && _pulse.isAnimating) {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
+    return Semantics(
+      button: true,
+      label: '누르고 있는 동안 말하기',
+      excludeSemantics: true,
+      child: Listener(
+        onPointerDown: (_) {
+          HapticFeedback.selectionClick();
+          s.pressTalk((m) => toast(context, m));
+        },
+        onPointerUp: (_) => s.releaseTalk(),
+        onPointerCancel: (_) => s.releaseTalk(),
+        child: AnimatedBuilder(
+          animation: _pulse,
+          builder: (context, _) {
+            final t = Curves.easeInOut.transform(_pulse.value);
+            return SizedBox(
+              width: 120,
+              height: 120,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (s.listening)
+                    Container(
+                      width: 92 + 28 * t,
+                      height: 92 + 28 * t,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: p.gold.withValues(alpha: 0.30 * (1 - t) + 0.08),
+                      ),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            n.headline,
-                            style: TextStyle(
-                              fontSize: 54,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1.5,
-                              color: p.ink,
-                              fontFeatures: tabular,
-                            ),
-                          ),
-                        ),
-                        if (summary.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            summary,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.5,
-                              color: p.muted,
-                              fontFeatures: tabular,
-                            ),
+                  AnimatedScale(
+                    duration: const Duration(milliseconds: 120),
+                    scale: s.listening ? 0.94 : 1,
+                    child: Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: s.listening ? p.gold : p.navy,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
-                      ],
+                      ),
+                      child: Icon(
+                        Icons.mic_rounded,
+                        size: 40,
+                        color: s.listening ? p.navy : Colors.white,
+                      ),
                     ),
                   ),
-          ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
