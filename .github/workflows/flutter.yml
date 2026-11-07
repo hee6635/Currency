@@ -45,15 +45,29 @@ jobs:
       - name: 서명 열쇠 풀기
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > android/app/upload-keystore.p12
+          KS=android/app/upload-keystore.p12
+          if [ -z "$KEYSTORE_B64" ]; then exit 0; fi
+          # 폰에서 붙여넣을 때 끼어드는 공백·줄바꿈 등 base64가 아닌 글자는 걸러낸다
+          CLEAN=$(printf '%s' "$KEYSTORE_B64" | tr -cd 'A-Za-z0-9+/=')
+          echo "받은 열쇠 길이: ${#CLEAN}자 (정상: 3512자)"
+          if ! printf '%s' "$CLEAN" | base64 -d > "$KS" 2>/dev/null; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 값이 깨졌어요 (${#CLEAN}자). 임시 서명으로 빌드합니다."
+            rm -f "$KS"; exit 0
           fi
+          PW=$(printf '%s' "$KEYSTORE_PW" | tr -d '\r\n')
+          if ! keytool -list -storetype PKCS12 -keystore "$KS" -storepass "$PW" > /dev/null 2>&1; then
+            echo "::warning::열쇠 파일을 열 수 없어요 (값이 잘렸거나 비밀번호가 달라요). 임시 서명으로 빌드합니다."
+            rm -f "$KS"; exit 0
+          fi
+          echo "서명 열쇠 확인 완료"
+          echo "::add-mask::$PW"
+          echo "ANDROID_KEYSTORE_PASSWORD=$PW" >> "$GITHUB_ENV"
 
       - name: APK 빌드
-        env:
-          # 열쇠나 비밀번호가 없으면 디버그 서명으로 빌드됨 (build.gradle.kts 참고)
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        # 위 단계에서 열쇠 확인이 끝나야 ANDROID_KEYSTORE_PASSWORD 가 설정됨.
+        # 없으면 디버그 서명으로 빌드 (build.gradle.kts 참고)
         run: flutter build apk --release
 
       - name: 서명 열쇠 지우기
@@ -62,8 +76,8 @@ jobs:
 
       - name: 서명 확인
         run: |
-          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "::warning::서명 Secret이 없어 임시(디버그) 서명으로 빌드했어요. 덮어 설치가 안 됩니다."
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::warning::고정 서명이 아니라 임시(디버그) 서명으로 빌드했어요. 덮어 설치가 안 됩니다."
           fi
           keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -E "Owner|SHA256" || true
 
