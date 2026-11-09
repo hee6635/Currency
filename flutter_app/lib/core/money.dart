@@ -113,6 +113,41 @@ List<(String sign, double? value)> exprTerms(String expr) {
   return out;
 }
 
+/// 화면에 줄 맞춰 보여줄 항목: 부호, 보기 좋은 글자("30,000 × 2"), 계산한 값
+/// 끝에 연산자만 남았으면 trailing 에 담는다.
+(List<(String sign, String text, double? value)>, String trailing) exprParts(
+  String expr,
+) {
+  final t = _tokens(expr);
+  var trailing = '';
+  if (t.isNotEmpty && operators.contains(t.last)) trailing = t.removeLast();
+  final values = exprTerms(expr);
+  final out = <(String, String, double?)>[];
+  var buf = <String>[];
+  var sign = opAdd;
+  void flush() {
+    if (buf.isEmpty) return;
+    final i = out.length;
+    out.add((
+      sign,
+      buf.map((x) => operators.contains(x) ? ' $x ' : fmt(int.parse(x))).join(),
+      i < values.length ? values[i].$2 : null,
+    ));
+    buf = [];
+  }
+
+  for (final x in t) {
+    if (x == opAdd || x == opSub) {
+      flush();
+      sign = x;
+    } else {
+      buf.add(x);
+    }
+  }
+  flush();
+  return (out, trailing);
+}
+
 /// 수식을 보기 좋게: "150000+2000" → "150,000 + 2,000"
 String prettyExpr(String expr) {
   if (expr.isEmpty) return '0';

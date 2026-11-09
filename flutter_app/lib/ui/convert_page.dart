@@ -8,6 +8,7 @@ import '../state/app_state.dart';
 import 'common.dart';
 import 'guide_page.dart';
 import 'teach_dialog.dart';
+import 'term_columns.dart';
 import 'motion.dart';
 import 'rate_sheet.dart';
 import 'theme.dart';
@@ -39,7 +40,8 @@ class ConvertPage extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, box) {
               final compact = box.maxHeight < 560;
-              final fromH = compact ? 96.0 : 116.0;
+              // 아래 가운데에 바꾸기 버튼이 겹치므로 아래 여백을 넉넉히
+              final fromH = compact ? 108.0 : 130.0;
               final toH = compact ? 112.0 : 140.0;
               return Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
@@ -161,16 +163,11 @@ class _InputCard extends StatelessWidget {
     final s = AppScope.of(context);
     final p = context.palette;
     final v = s.inputValue;
-    // 아래 작은 줄: 넣은 금액마다 바꾼 금액 (합계는 결과창에 있다)
-    final live = convertedTerms(s, min: 1);
-    final String sub = v == null
-        ? '0으로 나눌 수 없어요'
-        : live == null
-        ? ''
-        : '$live${s.from.other.unit}';
+    // 금액마다 바꾼 금액은 위 숫자 바로 아래에 줄 맞춰 나온다. 여기는 오류만.
+    final String sub = v == null ? '0으로 나눌 수 없어요' : '';
 
     return Panel(
-      padding: const EdgeInsets.fromLTRB(18, 10, 10, 12),
+      padding: const EdgeInsets.fromLTRB(18, 10, 10, 26),
       glow: s.listening ? p.gold : null,
       child: _SwapSlide(
         value: s.from,
@@ -207,13 +204,13 @@ class _InputCard extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: s.listening
-                        // 듣는 중: 들리는 말을 그대로 보여준다
-                        ? Text(
+                child: s.listening
+                    // 듣는 중: 들리는 말을 그대로 보여준다
+                    ? Align(
+                        alignment: Alignment.centerRight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
                             s.heard.isEmpty
                                 ? '"이십칠만 동"처럼 말해 보세요'
                                 : '${s.heard}…',
@@ -222,22 +219,22 @@ class _InputCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               color: s.heard.isEmpty ? p.muted : p.ink,
                             ),
-                          )
-                        : AnimatedNumberText(
-                            prettyExpr(s.expr),
-                            cursorColor: p.gold,
-                            style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.8,
-                              color: s.expr.isEmpty
-                                  ? p.muted.withValues(alpha: 0.6)
-                                  : p.ink,
-                              fontFeatures: tabular,
-                            ),
                           ),
-                  ),
-                ),
+                        ),
+                      )
+                    // 위: 넣은 금액, 아래: 항목마다 바꾼 금액 (줄 맞춤)
+                    : TermsView(
+                        child: TermColumns(
+                          expr: s.expr,
+                          from: s.from,
+                          convert: s.rate == null
+                              ? null
+                              : (v) => s.convert(v, s.from),
+                          topSize: 34,
+                          bottomSize: 19,
+                          cursor: true,
+                        ),
+                      ),
               ),
             ),
             if (s.listening && s.addMode)
@@ -259,11 +256,11 @@ class _InputCard extends StatelessWidget {
                   ],
                 ),
               )
-            else
+            else if (!s.listening && sub.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Text(
-                  s.listening ? '' : sub,
+                  sub,
                   textAlign: TextAlign.right,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -418,13 +415,6 @@ class _VoicePanel extends StatelessWidget {
     final r = s.resultValue;
     final endsWithOp =
         s.expr.isNotEmpty && operators.contains(s.expr[s.expr.length - 1]);
-    final exprLine = s.expr.isEmpty
-        ? ''
-        : endsWithOp
-        ? '${prettyExpr(s.expr)} …'
-        : hasOperator(s.expr)
-        ? '${prettyExpr(s.expr)} = ${total == null ? '—' : fmt(total)}${s.from.unit}'
-        : '${prettyExpr(s.expr)}${s.from.unit}';
 
     // 가운데 큰 글자: 듣는 중이면 들리는 말, 아니면 마지막으로 반영한 내용
     final String big;
@@ -510,12 +500,6 @@ class _VoicePanel extends StatelessWidget {
           Row(
             children: [
               _PanelPill(
-                icon: Icons.undo_rounded,
-                label: '하나 지우기',
-                onTap: s.expr.isEmpty || s.listening ? null : s.voiceDeleteOne,
-              ),
-              const SizedBox(width: 8),
-              _PanelPill(
                 icon: Icons.delete_outline_rounded,
                 label: '전체 지우기',
                 danger: true,
@@ -538,6 +522,12 @@ class _VoicePanel extends StatelessWidget {
                           );
                       },
               ),
+              const Spacer(),
+              _PanelPill(
+                icon: Icons.undo_rounded,
+                label: '하나 지우기',
+                onTap: s.expr.isEmpty || s.listening ? null : s.voiceDeleteOne,
+              ),
             ],
           ),
           // 듣는 중: 폰이 들은 말 그대로 (작게)
@@ -554,7 +544,7 @@ class _VoicePanel extends StatelessWidget {
           ),
           // 큰 글자: 바뀔 때마다 확대되듯 튀어나온다
           SizedBox(
-            height: 72,
+            height: 48,
             child: Center(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 320),
@@ -577,7 +567,7 @@ class _VoicePanel extends StatelessWidget {
                   child: Text(
                     big,
                     style: TextStyle(
-                      fontSize: bigMuted ? 26 : 50,
+                      fontSize: bigMuted ? 20 : 36,
                       fontWeight: FontWeight.w800,
                       letterSpacing: bigMuted ? -0.5 : -1.5,
                       color: bigMuted ? p.muted : p.ink,
@@ -589,19 +579,28 @@ class _VoicePanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            [
-              if (exprLine.isNotEmpty) exprLine,
-              if (r != null && s.expr.isNotEmpty && !endsWithOp)
-                '≈ ${convertedTerms(s) == null ? '' : '${convertedTerms(s)} = '}${fmt(r)}${s.from.other.unit}',
-            ].join('\n'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: p.muted,
-              fontFeatures: tabular,
-            ),
+          // 위: 동, 아래: 원. 금액마다 줄 맞춰서, 방금 말한 것은 금색 바탕
+          SizedBox(
+            height: 84,
+            child: s.expr.isEmpty
+                ? null
+                : TermsView(
+                    maxBeforeScroll: 4,
+                    alignment: Alignment.center,
+                    child: TermColumns(
+                      expr: s.expr,
+                      from: s.from,
+                      convert: s.rate == null
+                          ? null
+                          : (v) => s.convert(v, s.from),
+                      topSize: 26,
+                      bottomSize: 23,
+                      highlightLast: true,
+                      total: hasOperator(s.expr) && !endsWithOp && total != null
+                          ? (total, r)
+                          : null,
+                    ),
+                  ),
           ),
           const SizedBox(height: 20),
           const _TalkButton(),

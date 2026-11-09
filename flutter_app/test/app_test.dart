@@ -97,8 +97,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(s.expr, '185000');
-    // 결과 카드(크게)와 입력창 아래 작은 줄 둘 다
-    expect(find.text('10,000원'), findsNWidgets(2));
+    // 결과 카드(크게) + 입력창의 185,000 바로 아래 원화
+    expect(find.text('10,000원'), findsOneWidget);
+    expect(find.text('10,000'), findsWidgets); // 입력창 (+ 숨은 음성 창)
 
     // 더하면 입력창 아래에 금액마다 원화가 나온다
     await tester.tap(find.text('+').first);
@@ -106,7 +107,8 @@ void main() {
     await tester.tap(find.text('7').first);
     await tester.tap(find.text('000').first);
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('10,000 + 2,000원'), findsOneWidget);
+    expect(find.text('37,000'), findsWidgets);
+    expect(find.text('2,000'), findsWidgets); // 37,000 바로 아래
     expect(find.text('12,000원'), findsOneWidget);
 
     // 탭 이동

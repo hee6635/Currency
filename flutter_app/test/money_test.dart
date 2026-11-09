@@ -281,4 +281,13 @@ void main() {
     ]);
     expect(exprTerms('5÷0+1'), [(opAdd, null), (opAdd, 1.0)]);
   });
+
+  test('exprParts — 줄 맞춰 보여줄 항목', () {
+    final (parts, trailing) = exprParts('150000+30000×2−5000+');
+    expect(parts.map((x) => x.$2), ['150,000', '30,000 × 2', '5,000']);
+    expect(parts.map((x) => x.$1), [opAdd, opAdd, opSub]);
+    expect(parts.map((x) => x.$3), [150000.0, 60000.0, 5000.0]);
+    expect(trailing, opAdd);
+    expect(exprParts('').$1, isEmpty);
+  });
 }
