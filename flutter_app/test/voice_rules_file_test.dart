@@ -34,4 +34,21 @@ void main() {
     expect(say('젤만'), '70000');
     expect(say('57,000 /'), '57000');
   });
+
+  test('v4: 만 동이 동네 이름으로 들림', () {
+    String say(String t) => applySpoken('', t, addMode: true).expr;
+    expect(say('운동'), '50000');
+    expect(say('오금동'), '50000');
+    expect(say('이문동'), '20000');
+    expect(say('이현동'), '20000');
+    expect(say('45 운동'), '450000');
+    expect(say('45분도'), '450000');
+    expect(say('45분 동'), '450000');
+    expect(say('80년도'), '800000');
+    expect(say('80년대'), '800000');
+    expect(say('칠성동'), '7000');
+    expect(say('이십칠만 동'), '270000'); // 원래 말은 그대로
+    expect(say('오만 동'), '50000');
+    expect(say('삼천 동'), '3000');
+  });
 }
