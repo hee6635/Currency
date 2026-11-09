@@ -161,15 +161,13 @@ class _InputCard extends StatelessWidget {
     final s = AppScope.of(context);
     final p = context.palette;
     final v = s.inputValue;
-    final String sub;
-    if (v == null) {
-      sub = '0으로 나눌 수 없어요';
-    } else if (hasOperator(s.expr)) {
-      sub = '= ${fmt(v)}${s.from.unit}';
-    } else {
-      final u = koreanUnit(v);
-      sub = u.isEmpty ? '' : '$u${s.from.unit}';
-    }
+    // 아래 작은 줄: 넣은 금액마다 바꾼 금액 (합계는 결과창에 있다)
+    final live = convertedTerms(s, min: 1);
+    final String sub = v == null
+        ? '0으로 나눌 수 없어요'
+        : live == null
+        ? ''
+        : '$live${s.from.other.unit}';
 
     return Panel(
       padding: const EdgeInsets.fromLTRB(18, 10, 10, 12),
@@ -270,8 +268,11 @@ class _InputCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: v == null ? p.danger : p.muted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: v == null
+                        ? p.danger
+                        : currencyAccent(s.from.other, p),
                     fontFeatures: tabular,
                   ),
                 ),
@@ -505,6 +506,40 @@ class _VoicePanel extends StatelessWidget {
               ),
             ],
           ),
+          // 지우기 버튼: 말로 "지워"/"다 지워"와 같다
+          Row(
+            children: [
+              _PanelPill(
+                icon: Icons.undo_rounded,
+                label: '하나 지우기',
+                onTap: s.expr.isEmpty || s.listening ? null : s.voiceDeleteOne,
+              ),
+              const SizedBox(width: 8),
+              _PanelPill(
+                icon: Icons.delete_outline_rounded,
+                label: '전체 지우기',
+                danger: true,
+                onTap: s.expr.isEmpty || s.listening
+                    ? null
+                    : () {
+                        final before = s.voiceClearAll();
+                        HapticFeedback.mediumImpact();
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: const Text('전부 지웠어요'),
+                              duration: const Duration(seconds: 2),
+                              action: SnackBarAction(
+                                label: '되돌리기',
+                                onPressed: () => s.restoreExpr(before),
+                              ),
+                            ),
+                          );
+                      },
+              ),
+            ],
+          ),
           // 듣는 중: 폰이 들은 말 그대로 (작게)
           SizedBox(
             height: 22,
@@ -558,7 +593,7 @@ class _VoicePanel extends StatelessWidget {
             [
               if (exprLine.isNotEmpty) exprLine,
               if (r != null && s.expr.isNotEmpty && !endsWithOp)
-                '≈ ${fmt(r)}${s.from.other.unit}',
+                '≈ ${convertedTerms(s) == null ? '' : '${convertedTerms(s)} = '}${fmt(r)}${s.from.other.unit}',
             ].join('\n'),
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1280,4 +1315,76 @@ class _FlagSwapKey extends StatelessWidget {
       ),
     ),
   );
+}
+
+
+/// 수식의 항목마다 바꾼 금액: "50000+30000" → "2,632 + 1,579" (항목이 min개보다 적으면 null)
+String? convertedTerms(AppState s, {int min = 2}) {
+  if (s.rate == null) return null;
+  final t = exprTerms(s.expr);
+  if (t.isEmpty || t.length < min) return null;
+  final b = StringBuffer();
+  for (var i = 0; i < t.length; i++) {
+    final (sign, v) = t[i];
+    if (i > 0 || sign == opSub) b.write(i == 0 ? '$sign ' : ' $sign ');
+    b.write(v == null ? '—' : fmt(s.convert(v, s.from)));
+  }
+  return b.toString();
+}
+
+
+/// 음성 창 위쪽의 작은 알약 버튼. 누를 수 없으면 흐리게.
+class _PanelPill extends StatelessWidget {
+  const _PanelPill({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final color = danger ? p.danger : p.ink;
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 160),
+      opacity: onTap == null ? 0.35 : 1,
+      child: Material(
+        color: color.withValues(alpha: 0.08),
+        shape: const StadiumBorder(),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  onTap!();
+                },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 17, color: color),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

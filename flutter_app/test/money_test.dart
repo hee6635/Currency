@@ -269,4 +269,16 @@ void main() {
       expect(spokenSuspicion('7만'), 0);
     });
   });
+
+  test('exprTerms — 입력한 금액마다 나누기', () {
+    expect(exprTerms(''), isEmpty);
+    expect(exprTerms('50000'), [(opAdd, 50000.0)]);
+    expect(exprTerms('50000+10000'), [(opAdd, 50000.0), (opAdd, 10000.0)]);
+    expect(exprTerms('50000+30000×2−5000+'), [
+      (opAdd, 50000.0),
+      (opAdd, 60000.0),
+      (opSub, 5000.0),
+    ]);
+    expect(exprTerms('5÷0+1'), [(opAdd, null), (opAdd, 1.0)]);
+  });
 }

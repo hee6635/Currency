@@ -63,6 +63,19 @@ void main() {
     expect(s.resultValue, 185000 * 18.5);
   });
 
+  test('음성 창 지우기 버튼: 하나 / 전체 / 되돌리기', () async {
+    final s = await makeState();
+    s.expr = '50000+30000';
+    s.voiceDeleteOne();
+    expect(s.expr, '50000+');
+    s.voiceDeleteOne();
+    expect(s.expr, '50000');
+    final before = s.voiceClearAll();
+    expect(s.expr, '');
+    s.restoreExpr(before);
+    expect(s.expr, '50000');
+  });
+
   test('지폐 합계', () async {
     final s = await makeState();
     s.changeNote(500000, 2);
@@ -84,8 +97,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(s.expr, '185000');
-    expect(find.text('10,000원'), findsOneWidget);
-    expect(find.text('18만 5,000동'), findsOneWidget);
+    // 결과 카드(크게)와 입력창 아래 작은 줄 둘 다
+    expect(find.text('10,000원'), findsNWidgets(2));
+
+    // 더하면 입력창 아래에 금액마다 원화가 나온다
+    await tester.tap(find.text('+').first);
+    await tester.tap(find.text('3').first);
+    await tester.tap(find.text('7').first);
+    await tester.tap(find.text('000').first);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('10,000 + 2,000원'), findsOneWidget);
+    expect(find.text('12,000원'), findsOneWidget);
 
     // 탭 이동
     await tester.tap(find.text('보여주기'));

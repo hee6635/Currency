@@ -85,6 +85,34 @@ double? evaluate(String expr) {
   return total + sign * term;
 }
 
+/// 더하기·빼기로 나뉜 항목들: "50000+30000×2−5000" → [(+,50000),(+,60000),(−,5000)]
+/// 곱하기·나누기는 한 항목으로 묶어 계산한 값. 0으로 나누면 그 항목은 null.
+List<(String sign, double? value)> exprTerms(String expr) {
+  final t = _tokens(expr);
+  while (t.isNotEmpty && operators.contains(t.last)) {
+    t.removeLast();
+  }
+  final out = <(String, double?)>[];
+  if (t.isEmpty) return out;
+  var sign = opAdd;
+  double? term = double.parse(t[0]);
+  for (var i = 1; i + 1 < t.length; i += 2) {
+    final op = t[i];
+    final n = double.parse(t[i + 1]);
+    if (op == opMul) {
+      if (term != null) term *= n;
+    } else if (op == opDiv) {
+      term = (term == null || n == 0) ? null : term / n;
+    } else {
+      out.add((sign, term));
+      sign = op;
+      term = n;
+    }
+  }
+  out.add((sign, term));
+  return out;
+}
+
 /// 수식을 보기 좋게: "150000+2000" → "150,000 + 2,000"
 String prettyExpr(String expr) {
   if (expr.isEmpty) return '0';

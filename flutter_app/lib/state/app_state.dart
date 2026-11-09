@@ -520,6 +520,31 @@ class AppState extends ChangeNotifier {
     return step.message;
   }
 
+  /// 음성 창의 "하나 지우기" 버튼: 마지막 숫자나 기호 하나
+  void voiceDeleteOne() {
+    final (rest, tok) = removeLastToken(expr);
+    if (tok.isEmpty) return;
+    expr = rest;
+    _showNotice('${operators.contains(tok) ? tok : fmt(int.parse(tok))} 지움');
+    notifyListeners();
+  }
+
+  /// 음성 창의 "전체 지우기" 버튼. 되돌릴 수 있게 지우기 전 식을 돌려준다.
+  String voiceClearAll() {
+    final before = expr;
+    if (before.isEmpty) return before;
+    expr = '';
+    _showNotice('전부 지움');
+    notifyListeners();
+    return before;
+  }
+
+  void restoreExpr(String e) {
+    expr = e;
+    _showNotice('되돌림');
+    notifyListeners();
+  }
+
   // ---- 음성 모드 창에 크게 보여줄 마지막 내용 ----
 
   VoiceNotice? notice;
