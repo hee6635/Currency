@@ -290,4 +290,40 @@ void main() {
     expect(trailing, opAdd);
     expect(exprParts('').$1, isEmpty);
   });
+
+  group('editInPart — 중간 금액 고치기', () {
+    test('그 금액에만 숫자·지우기', () {
+      const e = '50000+30000+20000';
+      expect(editInPart(e, 1, 'back'), ('50000+3000+20000', 1));
+      expect(editInPart(e, 1, '5'), ('50000+300005+20000', 1));
+      expect(editInPart(e, 0, '000'), ('50000000+30000+20000', 0));
+    });
+
+    test('다 지우면 그 금액이 통째로 빠지고 앞 금액으로', () {
+      var (e, p) = ('50000+3+20000', 1 as int?);
+      (e, p) = editInPart(e, p!, 'back')!;
+      expect(e, '50000+20000');
+      expect(p, 0);
+      // 첫 금액을 다 지우면 다음 금액이 맨 앞이 됨
+      expect(editInPart('5+20000', 0, 'back'), ('20000', null));
+    });
+
+    test('곱하기도 그 금액에', () {
+      final (e, _) = editInPart('50000+30000+20000', 1, '×')!;
+      expect(e, '50000+30000×+20000');
+      expect(evaluate(e), 100000); // 아직 곱할 수 없으면 무시하고 계산
+      final (e2, _) = editInPart(e, 1, '2')!;
+      expect(e2, '50000+30000×2+20000');
+      expect(evaluate(e2), 130000);
+    });
+
+    test('+, −, =, C 는 그 금액이 아니라 평소처럼', () {
+      expect(editInPart('5+3+2', 0, opAdd), isNull);
+      expect(editInPart('5+3+2', 0, 'C'), isNull);
+    });
+
+    test('끝에 붙은 연산자는 그대로', () {
+      expect(editInPart('50000+30000+', 0, 'back'), ('5000+30000+', 0));
+    });
+  });
 }

@@ -43,7 +43,7 @@ class ConvertPage extends StatelessWidget {
               final compact = box.maxHeight < 560;
               // 아래 가운데에 바꾸기 버튼이 겹치므로 아래 여백을 넉넉히
               final fromH = compact ? 108.0 : 130.0;
-              final toH = compact ? 112.0 : 140.0;
+              final toH = compact ? 126.0 : 158.0; // 합계(동) 줄 포함
               return Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: Column(
@@ -236,16 +236,27 @@ class _InputCard extends StatelessWidget {
                         ),
                       )
                     // 위: 넣은 금액, 아래: 항목마다 바꾼 금액 (줄 맞춤)
-                    : TermsView(
-                        child: TermColumns(
-                          expr: s.expr,
-                          from: s.from,
-                          convert: s.rate == null
-                              ? null
-                              : (v) => s.convert(v, s.from),
-                          topSize: 34,
-                          bottomSize: 19,
-                          cursor: true,
+                    // 금액 말고 빈 곳을 누르면 다시 맨 끝에 이어 쓰기
+                    : GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => s.selectPart(null),
+                        child: TermsView(
+                          child: TermColumns(
+                            expr: s.expr,
+                            from: s.from,
+                            convert: s.rate == null
+                                ? null
+                                : (v) => s.convert(v, s.from),
+                            topSize: 34,
+                            bottomSize: 19,
+                            cursor: true,
+                            // 금액을 누르면 그 금액을 고친다 (⌫·숫자가 그 금액에)
+                            editPart: s.editPart,
+                            onTapPart: (i) {
+                              HapticFeedback.selectionClick();
+                              s.selectPart(s.editPart == i ? null : i);
+                            },
+                          ),
                         ),
                       ),
               ),
@@ -923,6 +934,20 @@ class _ResultCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // 넣은 금액 합계 (동): 위 입력창은 금액마다 나뉘어 있으므로 합계는 여기
+                  if (s.expr.isNotEmpty && s.inputValue != null)
+                    Text(
+                      '= ${fmt(s.inputValue!)}${s.from.unit}',
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: p.onNavy.withValues(alpha: 0.92),
+                        fontFeatures: tabular,
+                      ),
+                    ),
                   Text(
                     subs.join('  ·  '),
                     textAlign: TextAlign.right,

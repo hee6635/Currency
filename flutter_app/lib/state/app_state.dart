@@ -203,7 +203,30 @@ class AppState extends ChangeNotifier {
 
   // ---- 환산 ----
 
+  /// 입력창에서 골라 고치고 있는 항목 (null이면 맨 끝에 이어 쓰기)
+  int? editPart;
+
+  void selectPart(int? i) {
+    final n = exprParts(expr).$1.length;
+    final v = (i == null || i >= n - 1) ? null : i;
+    if (v == editPart) return;
+    editPart = v;
+    notifyListeners();
+  }
+
   void press(String key) {
+    if (editPart != null) {
+      final r = editInPart(expr, editPart!, key);
+      if (r != null) {
+        expr = r.$1;
+        final n = exprParts(expr).$1.length;
+        editPart = (r.$2 == null || r.$2! >= n - 1) ? null : r.$2;
+        notifyListeners();
+        return;
+      }
+      // +, −, =, C 는 평소처럼 맨 끝에서
+      editPart = null;
+    }
     final next = applyKey(expr, key);
     if (next == expr) return;
     if (key == 'C') archiveExpr();
@@ -240,6 +263,7 @@ class AppState extends ChangeNotifier {
     if (_loadedId != e.id) archiveExpr();
     final still = history.where((h) => h.id == e.id).firstOrNull ?? e;
     expr = still.expr;
+    editPart = null;
     _loadedId = still.id;
     notifyListeners();
   }
@@ -248,6 +272,7 @@ class AppState extends ChangeNotifier {
     final digits = parsePasted(text);
     if (digits == null) return false;
     expr = digits;
+    editPart = null;
     notifyListeners();
     return true;
   }
@@ -275,6 +300,7 @@ class AppState extends ChangeNotifier {
 
   void openVoice() {
     voiceMode = true;
+    editPart = null; // 말은 늘 맨 끝에 붙는다
     notice = null;
     notifyListeners();
   }
@@ -561,6 +587,7 @@ class AppState extends ChangeNotifier {
       _loadedId = null;
     }
     expr = step.expr;
+    editPart = null;
     _showNotice(step.headline);
     notifyListeners();
     return step.message;
@@ -571,6 +598,7 @@ class AppState extends ChangeNotifier {
     final (rest, tok) = removeLastToken(expr);
     if (tok.isEmpty) return;
     expr = rest;
+    editPart = null;
     _showNotice('${operators.contains(tok) ? tok : fmt(int.parse(tok))} 지움');
     notifyListeners();
   }
@@ -583,6 +611,7 @@ class AppState extends ChangeNotifier {
     _undoId = _loadedId;
     _loadedId = null;
     expr = '';
+    editPart = null;
     _showNotice('전부 지움');
     notifyListeners();
     return before;
@@ -592,6 +621,7 @@ class AppState extends ChangeNotifier {
 
   void restoreExpr(String e) {
     expr = e;
+    editPart = null;
     // 되돌린 식은 방금 저장한 칸과 같은 것 → 다시 지워도 칸이 늘지 않게
     _loadedId = _undoId;
     _showNotice('되돌림');

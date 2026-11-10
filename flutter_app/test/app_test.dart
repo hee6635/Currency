@@ -76,6 +76,31 @@ void main() {
     expect(s.expr, '50000');
   });
 
+  test('입력창에서 중간 금액을 골라 고치기', () async {
+    final s = await makeState();
+    s.expr = '50000+30000+20000';
+    s.selectPart(1);
+    expect(s.editPart, 1);
+    s.press('back');
+    s.press('back');
+    expect(s.expr, '50000+300+20000');
+    s.press('00');
+    expect(s.expr, '50000+30000+20000');
+    // +는 맨 끝에 새 금액
+    s.press('+');
+    expect(s.editPart, isNull);
+    expect(s.expr, '50000+30000+20000+');
+    // 마지막 금액을 고르면 그냥 맨 끝
+    s.selectPart(3);
+    expect(s.editPart, isNull);
+    // 중간 금액을 다 지우면 빠짐
+    s.expr = '50000+3+20000';
+    s.selectPart(1);
+    s.press('back');
+    expect(s.expr, '50000+20000');
+    expect(s.editPart, 0); // 바로 앞 금액(50,000)으로 커서가 감
+  });
+
   test('지폐 합계', () async {
     final s = await makeState();
     s.changeNote(500000, 2);

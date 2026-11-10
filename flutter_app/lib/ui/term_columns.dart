@@ -19,7 +19,15 @@ class TermColumns extends StatelessWidget {
     this.cursor = false,
     this.highlightLast = false,
     this.total,
+    this.editPart,
+    this.onTapPart,
   });
+
+  /// 골라서 고치는 중인 항목 (커서와 금색 바탕이 그 항목에)
+  final int? editPart;
+
+  /// 항목을 눌렀을 때
+  final void Function(int index)? onTapPart;
 
   final String expr;
   final Currency from;
@@ -114,19 +122,28 @@ class TermColumns extends StatelessWidget {
       final (sign, text, v) = parts[i];
       final last = i == parts.length - 1;
       if (i > 0 || sign == opSub) cells.add(gap(sign));
-      final topW = last && cursor && trailing.isEmpty
+      final editing = editPart == i;
+      final cursorHere =
+          cursor && (editPart == null ? last && trailing.isEmpty : editing);
+      final topW = cursorHere
           ? AnimatedNumberText(text, cursorColor: p.gold, style: top)
           : Text(text, style: top);
-      cells.add(
-        col(
-          topW,
-          Text(
-            v == null || convert == null ? '—' : fmt(convert!(v)),
-            style: bottom,
-          ),
-          hi: last && highlightLast && parts.length > 1,
+      Widget cell = col(
+        topW,
+        Text(
+          v == null || convert == null ? '—' : fmt(convert!(v)),
+          style: bottom,
         ),
+        hi: editing || (last && highlightLast && parts.length > 1),
       );
+      if (onTapPart != null) {
+        cell = GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onTapPart!(i),
+          child: cell,
+        );
+      }
+      cells.add(cell);
     }
     if (trailing.isNotEmpty) {
       cells.add(

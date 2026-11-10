@@ -57,13 +57,27 @@ List<String> _tokens(String expr) =>
 
 bool hasOperator(String expr) => operators.any(expr.contains);
 
+/// 계산용 토큰: 중간 항목을 고치다 생긴 "30000×+20000" 같은 걸린 연산자는 빼고,
+/// 맨 앞·맨 끝 연산자도 뺀다. 항상 숫자 (연산 숫자)* 모양.
+List<String> _calcTokens(String expr) {
+  final out = <String>[];
+  for (final t in _tokens(expr)) {
+    if (operators.contains(t)) {
+      if (out.isEmpty) continue;
+      if (operators.contains(out.last)) out.removeLast();
+    }
+    out.add(t);
+  }
+  while (out.isNotEmpty && operators.contains(out.last)) {
+    out.removeLast();
+  }
+  return out;
+}
+
 /// 수식 계산. 곱셈/나눗셈 먼저. 0으로 나누면 null.
 /// 끝에 붙은 연산자는 무시한다 ("100+" → 100).
 double? evaluate(String expr) {
-  final t = _tokens(expr);
-  while (t.isNotEmpty && operators.contains(t.last)) {
-    t.removeLast();
-  }
+  final t = _calcTokens(expr);
   if (t.isEmpty) return 0;
   double total = 0;
   double term = double.parse(t[0]);
@@ -88,10 +102,7 @@ double? evaluate(String expr) {
 /// 더하기·빼기로 나뉜 항목들: "50000+30000×2−5000" → [(+,50000),(+,60000),(−,5000)]
 /// 곱하기·나누기는 한 항목으로 묶어 계산한 값. 0으로 나누면 그 항목은 null.
 List<(String sign, double? value)> exprTerms(String expr) {
-  final t = _tokens(expr);
-  while (t.isNotEmpty && operators.contains(t.last)) {
-    t.removeLast();
-  }
+  final t = _calcTokens(expr);
   final out = <(String, double?)>[];
   if (t.isEmpty) return out;
   var sign = opAdd;
@@ -146,6 +157,63 @@ List<(String sign, double? value)> exprTerms(String expr) {
   }
   flush();
   return (out, trailing);
+}
+
+/// 더하기·빼기로 나뉜 항목의 원래 글자: "50000+30000×2+" → ([(+,"50000"),(+,"30000×2")], "+")
+(List<(String sign, String raw)>, String trailing) _rawParts(String expr) {
+  final out = <(String, String)>[];
+  var sign = opAdd;
+  var buf = StringBuffer();
+  var trailing = '';
+  final t = _tokens(expr);
+  for (var i = 0; i < t.length; i++) {
+    final x = t[i];
+    if (x == opAdd || x == opSub) {
+      if (i == t.length - 1) {
+        trailing = x;
+        break;
+      }
+      if (buf.isNotEmpty) out.add((sign, buf.toString()));
+      buf = StringBuffer();
+      sign = x;
+    } else {
+      buf.write(x);
+    }
+  }
+  if (buf.isNotEmpty) out.add((sign, buf.toString()));
+  return (out, trailing);
+}
+
+/// 입력창에서 중간 항목을 골라 고칠 때: 그 항목에만 키를 적용한다.
+/// (새 수식, 계속 고칠 항목). 그 항목에서 처리할 키가 아니면(+, − 등) null.
+/// ⌫로 항목이 비면 그 항목을 통째로 빼고 앞 항목으로 간다.
+(String, int?)? editInPart(String expr, int part, String key) {
+  if (key == opAdd || key == opSub || key == 'C' || key == '=') return null;
+  final (parts, trailing) = _rawParts(expr);
+  if (part < 0 || part >= parts.length) return null;
+  final (sign, raw) = parts[part];
+  final list = [...parts];
+  int? next = part;
+  if (key == 'back') {
+    final r = raw.substring(0, raw.length - 1);
+    if (r.isEmpty) {
+      list.removeAt(part);
+      next = part > 0 ? part - 1 : null;
+    } else {
+      list[part] = (sign, r);
+    }
+  } else {
+    final r = applyKey(raw, key);
+    if (r == raw) return (expr, part);
+    list[part] = (sign, r);
+  }
+  final b = StringBuffer();
+  for (var i = 0; i < list.length; i++) {
+    if (i > 0) b.write(list[i].$1);
+    b.write(list[i].$2);
+  }
+  if (list.isNotEmpty) b.write(trailing);
+  return (b.toString(), list.isEmpty ? null : next);
 }
 
 /// 수식을 보기 좋게: "150000+2000" → "150,000 + 2,000"
