@@ -43,7 +43,7 @@ class ConvertPage extends StatelessWidget {
               final compact = box.maxHeight < 560;
               // 아래 가운데에 바꾸기 버튼이 겹치므로 아래 여백을 넉넉히
               final fromH = compact ? 108.0 : 130.0;
-              final toH = compact ? 126.0 : 158.0; // 합계(동) 줄 포함
+              final toH = compact ? 112.0 : 140.0;
               return Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: Column(
@@ -830,15 +830,9 @@ class _ResultCard extends StatelessWidget {
     } else {
       big = '${fmt(r)}${to.unit}';
       if (r > 0) {
-        if (to == Currency.krw) {
-          if (r >= 1000) subs.add('약 ${fmt(roundTo(r, 100))}원');
-          final u = koreanUnit(r);
-          if (u.isNotEmpty) subs.add('$u원');
-        } else {
-          final u = koreanUnit(r);
-          if (u.isNotEmpty) subs.add('$u동');
-          if (r >= 1000) subs.add('${fmt(r / 1000)}K');
-        }
+        // 만 단위로 읽기 쉽게 (1만 미만은 숫자와 같으니 생략)
+        final u = koreanUnit(r);
+        if (u.isNotEmpty) subs.add('$u${to.unit}');
         if (s.feePercent > 0) {
           feeLine =
               '수수료 ${s.feePercent.toStringAsFixed(1)}% 반영 ≈ ${fmt(s.withFee(r))}${to.unit}';
@@ -934,30 +928,37 @@ class _ResultCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // 넣은 금액 합계 (동): 위 입력창은 금액마다 나뉘어 있으므로 합계는 여기
-                  if (s.expr.isNotEmpty && s.inputValue != null)
-                    Text(
-                      '= ${fmt(s.inputValue!)}${s.from.unit}',
-                      textAlign: TextAlign.right,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: p.onNavy.withValues(alpha: 0.92),
-                        fontFeatures: tabular,
+                  // 아래 줄: 왼쪽 넣은 금액 합계(동) → 오른쪽 어림값(원)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      if (s.expr.isNotEmpty && s.inputValue != null)
+                        Text(
+                          '= ${fmt(s.inputValue!)}${s.from.unit}',
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: p.onNavy.withValues(alpha: 0.92),
+                            fontFeatures: tabular,
+                          ),
+                        ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          subs.join('  ·  '),
+                          textAlign: TextAlign.right,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: p.onNavyMuted,
+                            fontFeatures: tabular,
+                          ),
+                        ),
                       ),
-                    ),
-                  Text(
-                    subs.join('  ·  '),
-                    textAlign: TextAlign.right,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: p.onNavyMuted,
-                      fontFeatures: tabular,
-                    ),
+                    ],
                   ),
                   if (feeLine != null)
                     Text(
