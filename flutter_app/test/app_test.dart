@@ -119,4 +119,30 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(find.byType(TextField), findsOneWidget);
   });
+
+  testWidgets('메모: 저장된 메모를 다 읽기 전에 화면이 떠도 사라지지 않음 (업데이트 뒤 버그)', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({'memo': '야시장 가기'});
+    final prefs = await SharedPreferences.getInstance();
+    // 아직 load() 전 (실제 앱처럼 화면이 먼저 뜸)
+    final s = AppState(service: fakeService(), prefs: prefs);
+    await tester.pumpWidget(VnCurrencyApp(state: s));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 읽기 전에 저장이 불려도 저장된 메모를 덮어쓰지 않음
+    s.setMemo('기본 메모');
+    s.saveMemoNow();
+    expect(prefs.getString('memo'), '야시장 가기');
+
+    await s.load();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('메모'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('야시장 가기'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '야시장 가기\n쌀국수');
+    s.saveMemoNow();
+    expect(prefs.getString('memo'), '야시장 가기\n쌀국수');
+  });
 }

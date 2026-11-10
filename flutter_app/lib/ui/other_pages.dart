@@ -655,17 +655,24 @@ class MemoPage extends StatefulWidget {
 }
 
 class _MemoPageState extends State<MemoPage> {
-  TextEditingController? _ctrl;
+  final _ctrl = TextEditingController();
+  bool _filled = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _ctrl ??= TextEditingController(text: AppScope.read(context).memo);
+    // 메모 탭은 앱이 켜질 때 바로 만들어지는데, 그때는 저장된 메모를 아직 못 읽었을 수 있다.
+    // 다 읽은 뒤에 한 번만 채운다 (그 전에는 입력도 막아서 덮어쓰지 않게).
+    final s = AppScope.of(context);
+    if (!_filled && s.loaded) {
+      _filled = true;
+      _ctrl.text = s.memo;
+    }
   }
 
   @override
   void dispose() {
-    _ctrl?.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
@@ -683,6 +690,7 @@ class _MemoPageState extends State<MemoPage> {
               padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
               child: TextField(
                 controller: _ctrl,
+                readOnly: !_filled,
                 onChanged: s.setMemo,
                 expands: true,
                 maxLines: null,

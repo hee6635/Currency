@@ -108,6 +108,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 저장된 값을 다 읽었는지. 읽기 전에는 메모를 저장하지 않는다
+  /// (읽기 전 기본 메모로 저장된 메모를 덮어쓰지 않게).
+  bool loaded = false;
+
   Future<void> load() async {
     voiceLog.load();
     final p = _prefs ??= await SharedPreferences.getInstance();
@@ -123,6 +127,7 @@ class AppState extends ChangeNotifier {
     feePercent = (p.getDouble('fee') ?? 0).clamp(0, 10).toDouble();
     from = p.getString('from') == 'krw' ? Currency.krw : Currency.vnd;
     memo = p.getString('memo') ?? defaultMemo;
+    loaded = true;
     try {
       final raw = jsonDecode(p.getString('notes') ?? '{}') as Map;
       noteCounts = raw.map(
@@ -613,6 +618,7 @@ class AppState extends ChangeNotifier {
       noteCounts.entries.fold(0, (sum, e) => sum + e.key * e.value);
 
   void setMemo(String text) {
+    if (!loaded) return;
     memo = text;
     _memoTimer?.cancel();
     _memoTimer = Timer(const Duration(milliseconds: 400), saveMemoNow);
@@ -620,6 +626,7 @@ class AppState extends ChangeNotifier {
 
   void saveMemoNow() {
     _memoTimer?.cancel();
+    if (!loaded) return;
     _prefs?.setString('memo', memo);
   }
 
