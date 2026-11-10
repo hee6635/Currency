@@ -514,6 +514,8 @@ class _VoicePanel extends StatelessWidget {
                             SnackBar(
                               content: const Text('전부 지웠어요'),
                               duration: const Duration(seconds: 2),
+                              // 버튼이 있는 알림은 기본으로 안 사라지므로 2초 뒤 닫히게
+                              persist: false,
                               action: SnackBarAction(
                                 label: '되돌리기',
                                 onPressed: () => s.restoreExpr(before),
