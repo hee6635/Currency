@@ -44,9 +44,14 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    // 앱이 백그라운드로 갈 때 메모를 바로 저장
+    // 앱이 백그라운드로 갈 때 메모를 바로 저장하고, 하던 계산은 최근 계산에 넣어 둔다
+    // (다시 켜면 입력창은 비어 있고, 최근 계산에서 불러오면 이어서 할 수 있다)
     _life = AppLifecycleListener(
-      onHide: () => AppScope.read(context).saveMemoNow(),
+      onHide: () {
+        final s = AppScope.read(context);
+        s.saveMemoNow();
+        if (s.loaded) s.archiveExpr();
+      },
     );
   }
 

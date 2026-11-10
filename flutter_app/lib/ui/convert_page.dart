@@ -7,6 +7,7 @@ import '../core/money.dart';
 import '../state/app_state.dart';
 import 'common.dart';
 import 'guide_page.dart';
+import 'history_sheet.dart';
 import 'teach_dialog.dart';
 import 'term_columns.dart';
 import 'motion.dart';
@@ -181,6 +182,18 @@ class _InputCard extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  IconButton(
+                    tooltip: '최근 계산',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.history_rounded,
+                      size: 21,
+                      color: s.history.isEmpty
+                          ? p.muted.withValues(alpha: 0.5)
+                          : p.muted,
+                    ),
+                    onPressed: () => showHistorySheet(context),
+                  ),
                   IconButton(
                     tooltip: '금액 붙여넣기',
                     visualDensity: VisualDensity.compact,
@@ -1318,7 +1331,6 @@ class _FlagSwapKey extends StatelessWidget {
   );
 }
 
-
 /// 수식의 항목마다 바꾼 금액: "50000+30000" → "2,632 + 1,579" (항목이 min개보다 적으면 null)
 String? convertedTerms(AppState s, {int min = 2}) {
   if (s.rate == null) return null;
@@ -1332,7 +1344,6 @@ String? convertedTerms(AppState s, {int min = 2}) {
   }
   return b.toString();
 }
-
 
 /// 음성 창 위쪽의 작은 알약 버튼. 누를 수 없으면 흐리게.
 class _PanelPill extends StatelessWidget {

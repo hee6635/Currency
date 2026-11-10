@@ -120,9 +120,7 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
   });
 
-  testWidgets('메모: 저장된 메모를 다 읽기 전에 화면이 떠도 사라지지 않음 (업데이트 뒤 버그)', (
-    tester,
-  ) async {
+  testWidgets('메모: 저장된 메모를 다 읽기 전에 화면이 떠도 사라지지 않음 (업데이트 뒤 버그)', (tester) async {
     SharedPreferences.setMockInitialValues({'memo': '야시장 가기'});
     final prefs = await SharedPreferences.getInstance();
     // 아직 load() 전 (실제 앱처럼 화면이 먼저 뜸)

@@ -70,9 +70,13 @@ class TermColumns extends StatelessWidget {
     Widget col(Widget a, Widget? b, {bool hi = false, bool center = false}) {
       final c = Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment:
-            center ? CrossAxisAlignment.center : CrossAxisAlignment.end,
-        children: [a, if (hasBottom) b ?? Text('', style: bottom)],
+        crossAxisAlignment: center
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.end,
+        children: [
+          a,
+          if (hasBottom) b ?? Text('', style: bottom),
+        ],
       );
       if (!hi) return c;
       return Container(
@@ -116,7 +120,10 @@ class TermColumns extends StatelessWidget {
       cells.add(
         col(
           topW,
-          Text(v == null || convert == null ? '—' : fmt(convert!(v)), style: bottom),
+          Text(
+            v == null || convert == null ? '—' : fmt(convert!(v)),
+            style: bottom,
+          ),
           hi: last && highlightLast && parts.length > 1,
         ),
       );
@@ -127,7 +134,11 @@ class TermColumns extends StatelessWidget {
           padding: EdgeInsets.only(left: topSize * 0.22),
           child: col(
             cursor
-                ? AnimatedNumberText(trailing, cursorColor: p.gold, style: opTop)
+                ? AnimatedNumberText(
+                    trailing,
+                    cursorColor: p.gold,
+                    style: opTop,
+                  )
                 : Text(trailing, style: opTop),
             null,
           ),
@@ -139,7 +150,10 @@ class TermColumns extends StatelessWidget {
       cells.add(
         col(
           Text(fmt(t), style: top.copyWith(fontWeight: FontWeight.w800)),
-          Text(r == null ? '—' : fmt(r), style: bottom.copyWith(fontWeight: FontWeight.w900)),
+          Text(
+            r == null ? '—' : fmt(r),
+            style: bottom.copyWith(fontWeight: FontWeight.w900),
+          ),
         ),
       );
     }
@@ -167,7 +181,8 @@ class TermsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final count = exprParts(child.expr).$1.length + (child.total == null ? 0 : 1);
+    final count =
+        exprParts(child.expr).$1.length + (child.total == null ? 0 : 1);
     return LayoutBuilder(
       builder: (context, box) {
         if (count <= maxBeforeScroll || !box.hasBoundedWidth) {

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/calc_history.dart';
 import '../core/money.dart';
 import '../core/rate_service.dart';
 import '../core/voice.dart';
@@ -127,6 +128,7 @@ class AppState extends ChangeNotifier {
     feePercent = (p.getDouble('fee') ?? 0).clamp(0, 10).toDouble();
     from = p.getString('from') == 'krw' ? Currency.krw : Currency.vnd;
     memo = p.getString('memo') ?? defaultMemo;
+    history = CalcHistory.decode(p.getString('history'));
     loaded = true;
     try {
       final raw = jsonDecode(p.getString('notes') ?? '{}') as Map;
@@ -204,7 +206,41 @@ class AppState extends ChangeNotifier {
   void press(String key) {
     final next = applyKey(expr, key);
     if (next == expr) return;
+    if (key == 'C') archiveExpr();
     expr = next;
+    if (key == 'C') _loadedId = null;
+    notifyListeners();
+  }
+
+  // ---- 최근 계산 (지운 식, 앱을 닫을 때 하던 식. 최근 5개) ----
+
+  List<CalcEntry> history = const [];
+
+  /// 지금 입력창의 식이 최근 계산의 어느 칸에서 왔는지 (고치면 그 칸을 바꾼다)
+  int? _loadedId;
+  int? get loadedHistoryId => _loadedId;
+
+  /// 지금 식을 최근 계산에 넣는다. 불러온 식이면 그 칸을 고친 내용으로 바꿔 맨 위로.
+  void archiveExpr() {
+    final (next, id) = CalcHistory.add(
+      history,
+      expr,
+      replaceId: _loadedId,
+      now: DateTime.now(),
+    );
+    if (id == null) return;
+    history = next;
+    _loadedId = id;
+    _prefs?.setString('history', CalcHistory.encode(history));
+    notifyListeners();
+  }
+
+  /// 최근 계산 하나를 입력창으로. 입력 중이던 식은 먼저 최근 계산에 넣는다.
+  void loadHistory(CalcEntry e) {
+    if (_loadedId != e.id) archiveExpr();
+    final still = history.where((h) => h.id == e.id).firstOrNull ?? e;
+    expr = still.expr;
+    _loadedId = still.id;
     notifyListeners();
   }
 
@@ -519,6 +555,11 @@ class AppState extends ChangeNotifier {
   String? applyHeard(String text) {
     final step = applySpoken(expr, text, addMode: addMode);
     if (!step.changed) return step.message ?? '"$text"을(를) 알아듣지 못했어요';
+    if (step.expr.isEmpty && expr.isNotEmpty) {
+      // "다 지워" / "새로": 지우기 전 식은 최근 계산에
+      archiveExpr();
+      _loadedId = null;
+    }
     expr = step.expr;
     _showNotice(step.headline);
     notifyListeners();
@@ -538,14 +579,21 @@ class AppState extends ChangeNotifier {
   String voiceClearAll() {
     final before = expr;
     if (before.isEmpty) return before;
+    archiveExpr();
+    _undoId = _loadedId;
+    _loadedId = null;
     expr = '';
     _showNotice('전부 지움');
     notifyListeners();
     return before;
   }
 
+  int? _undoId;
+
   void restoreExpr(String e) {
     expr = e;
+    // 되돌린 식은 방금 저장한 칸과 같은 것 → 다시 지워도 칸이 늘지 않게
+    _loadedId = _undoId;
     _showNotice('되돌림');
     notifyListeners();
   }
