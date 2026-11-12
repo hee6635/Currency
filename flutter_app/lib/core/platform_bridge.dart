@@ -5,6 +5,15 @@ import 'package:flutter/services.dart';
 class PlatformBridge {
   static const _ch = MethodChannel('vn_currency/app');
 
+  /// 안드로이드에서 오는 버튼 신호 받기 (음량 ↓ 누름/뗌, 음량 ↑)
+  static void listen(void Function(String key) onKey) {
+    _ch.setMethodCallHandler((call) async => onKey(call.method));
+  }
+
+  /// 음성 창이 떠 있는 동안만 음량 버튼을 무전기·지우기로 쓴다
+  static Future<void> setVolumeKeys(bool on) =>
+      _call('setVolumeKeys', {'on': on});
+
   /// 홈 화면 위젯에 보여줄 환율을 넘기고 위젯을 다시 그리게 한다
   static Future<void> updateWidget({
     required double rate,

@@ -336,6 +336,7 @@ class AppState extends ChangeNotifier {
 
   void openVoice() {
     voiceMode = true;
+    _syncVolumeKeys();
     editPart = null; // 말은 늘 맨 끝에 붙는다
     notice = null;
     notifyListeners();
@@ -344,6 +345,7 @@ class AppState extends ChangeNotifier {
   void closeVoice() {
     if (listening) releaseTalk();
     voiceMode = false;
+    _syncVolumeKeys();
     notifyListeners();
   }
 
@@ -408,6 +410,39 @@ class AppState extends ChangeNotifier {
   /// 지난번에 음성인식이 "바쁨"으로 꼬였는지 (다음 누를 때 먼저 정리)
   bool _busyBefore = false;
   int _busyRetries = 0;
+
+  /// 앱의 환산 화면이 보이는 동안: 음량 버튼으로 바로 말하기 (음성 창 없이도)
+  bool calcVolumeKeys = false;
+
+  void setCalcVolumeKeys(bool on) {
+    if (calcVolumeKeys == on) return;
+    calcVolumeKeys = on;
+    _syncVolumeKeys();
+  }
+
+  /// 앱이 다시 보일 때 안드로이드 쪽에 다시 알려 준다 (화면이 새로 만들어졌을 수 있음)
+  void resyncVolumeKeys() => _syncVolumeKeys();
+
+  void _syncVolumeKeys() =>
+      PlatformBridge.setVolumeKeys(voiceMode || calcVolumeKeys);
+
+  /// 폰 음량 버튼: ↓ 누르고 있는 동안 듣기(음성 창이 없으면 열고), ↑ 하나 지우기
+  void onHardwareKey(String key) {
+    if (!voiceMode && !calcVolumeKeys) return;
+    switch (key) {
+      case 'talkDown':
+        if (!voiceMode) openVoice();
+        HapticFeedback.selectionClick();
+        pressTalk((_) {}); // 알릴 말은 음성 창 안에 보인다
+      case 'talkUp':
+        releaseTalk();
+      case 'deleteOne':
+        if (!listening) {
+          HapticFeedback.selectionClick();
+          voiceDeleteOne();
+        }
+    }
+  }
 
   /// 무전기 방식: 누르는 순간 듣기 시작
   Future<void> pressTalk(void Function(String) onMessage) async {

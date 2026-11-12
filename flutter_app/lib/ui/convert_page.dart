@@ -672,7 +672,7 @@ class VoicePanel extends StatelessWidget {
           Text(
             s.listening
                 ? (s.voiceReady ? '듣는 중 · 다 말한 뒤 손을 떼세요' : '잠깐만요… 진동이 오면 말하세요')
-                : '누르고 있는 동안 들어요 · "지워", "얼마"도 돼요',
+                : '누르고 있는 동안 들어요 · 음량 ↓ 를 눌러도 돼요',
             style: TextStyle(
               fontSize: 13,
               color: s.listening ? p.goldText : p.muted,

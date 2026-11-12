@@ -2,6 +2,7 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 
+import 'core/platform_bridge.dart';
 import 'state/app_state.dart';
 import 'ui/convert_page.dart';
 import 'ui/other_pages.dart';
@@ -11,6 +12,7 @@ import 'ui/voice_popup.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final state = AppState();
+  PlatformBridge.listen(state.onHardwareKey);
   // 홈 화면 위젯·측면 버튼으로 연 음성 창
   if (PlatformDispatcher.instance.defaultRouteName == '/voice') {
     state.load().then((_) => state.openVoice());
@@ -58,13 +60,24 @@ class _HomeShellState extends State<HomeShell> {
     // (다시 켜면 입력창은 비어 있고, 최근 계산에서 불러오면 이어서 할 수 있다)
     _life = AppLifecycleListener(
       // 음성 팝업에서 "앱으로 이동"했거나 팝업에서 계산했으면 이어받는다
-      onResume: () => AppScope.read(context).syncFromPopup(),
+      onResume: () {
+        final s = AppScope.read(context);
+        s.syncFromPopup();
+        s.resyncVolumeKeys();
+      },
       onHide: () {
         final s = AppScope.read(context);
         s.saveMemoNow();
         if (s.loaded) s.archiveExpr();
       },
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 환산 화면에서는 음량 ↓ 를 누르고 있으면 바로 말로 입력
+    AppScope.read(context).setCalcVolumeKeys(_tab == 0);
   }
 
   @override
@@ -95,6 +108,7 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: (i) {
           FocusScope.of(context).unfocus();
           setState(() => _tab = i);
+          AppScope.read(context).setCalcVolumeKeys(i == 0);
         },
         destinations: const [
           NavigationDestination(

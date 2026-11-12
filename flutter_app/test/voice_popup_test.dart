@@ -63,4 +63,18 @@ void main() {
     app.press('C');
     expect(app.history.length, before);
   });
+
+  test('음량 버튼: 음성 창도 환산 화면도 아니면 무시, 음량 ↑ 는 하나 지우기', () async {
+    final s = await makeState();
+    s.expr = '50000+30000';
+    s.onHardwareKey('deleteOne');
+    expect(s.expr, '50000+30000'); // 다른 탭: 소리 조절 그대로
+    s.setCalcVolumeKeys(true);
+    s.onHardwareKey('deleteOne');
+    expect(s.expr, '50000+');
+    s.setCalcVolumeKeys(false);
+    s.openVoice();
+    s.onHardwareKey('deleteOne');
+    expect(s.expr, '50000');
+  });
 }
