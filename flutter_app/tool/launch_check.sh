@@ -23,7 +23,7 @@ else
   FAIL=1
 fi
 
-# 2) 홈 화면 위 음성 창 (측면 버튼용 "말로 환율"과 같은 화면)
+# 2) 홈 화면 위 음성 창 (위젯·"말로 입력" 바로가기로 여는 화면)
 adb shell input keyevent KEYCODE_HOME
 sleep 2
 adb shell am start -n "$PKG/.VoicePopupActivity"
@@ -38,7 +38,7 @@ fi
 
 # 3) 위젯·바로가기 등록 확인
 adb shell dumpsys package "$PKG" > "$OUT/package.txt" || true
-for name in RateWidgetWide RateWidgetSquare VoiceLauncher; do
+for name in RateWidgetWide RateWidgetSquare; do
   if grep -q "$name" "$OUT/package.txt"; then
     echo "$name 등록됨"
   else

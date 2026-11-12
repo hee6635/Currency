@@ -6,7 +6,7 @@ import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode
 import io.flutter.embedding.engine.FlutterEngine
 
 /**
- * 홈 화면 위젯 · 측면 버튼(말로 환율) · 아이콘 길게 누르기로 여는 음성 입력 창.
+ * 홈 화면 위젯 · 아이콘 길게 누르기 · 루틴의 "말로 입력" 앱 동작으로 여는 음성 입력 창.
  * 홈 화면 위에 투명하게 떠서, 앱 안의 음성 창만 보여준다 (Flutter 쪽 경로 "/voice").
  * 음량 ↓ 를 누르고 있는 동안 듣고, 음량 ↑ 는 하나 지우기.
  */

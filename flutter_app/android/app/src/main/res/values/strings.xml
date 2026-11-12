@@ -5,5 +5,4 @@
     <string name="widget_wide_desc">누르면 바로 말로 입력하는 창이 떠요</string>
     <string name="widget_square_desc">누르면 바로 말로 입력하는 창이 떠요</string>
     <string name="shortcut_voice">말로 입력</string>
-    <string name="voice_launcher_label">말로 환율</string>
 </resources>

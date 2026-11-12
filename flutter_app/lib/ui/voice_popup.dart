@@ -19,7 +19,7 @@ class VoicePopupApp extends StatelessWidget {
     return AppScope(
       state: state,
       child: MaterialApp(
-        title: '말로 환율',
+        title: '말로 입력',
         debugShowCheckedModeBanner: false,
         theme: clear(Brightness.light),
         darkTheme: clear(Brightness.dark),
