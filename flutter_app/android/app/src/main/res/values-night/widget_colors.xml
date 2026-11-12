@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#FF151C2E</color>
+    <color name="widget_ink">#FFEDF0F7</color>
+    <color name="widget_muted">#FF9AA3B6</color>
+    <color name="widget_accent">#FF8FA6E6</color>
+    <color name="widget_mic_bg">#FFE8BE66</color>
+    <color name="widget_mic_fg">#FF17264F</color>
+    <color name="widget_dot">#FF2ECC71</color>
+</resources>

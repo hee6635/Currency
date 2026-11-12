@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/calc_history.dart';
 import '../core/money.dart';
+import '../core/platform_bridge.dart';
 import '../core/rate_service.dart';
 import '../core/voice.dart';
 import '../core/voice_log.dart';
@@ -130,6 +131,12 @@ class AppState extends ChangeNotifier {
     memo = p.getString('memo') ?? defaultMemo;
     history = CalcHistory.decode(p.getString('history'));
     loaded = true;
+    if (rate != null) {
+      PlatformBridge.updateWidget(
+        rate: rate!,
+        time: rateTime ?? DateTime.now(),
+      );
+    }
     try {
       final raw = jsonDecode(p.getString('notes') ?? '{}') as Map;
       noteCounts = raw.map(
@@ -178,6 +185,7 @@ class AppState extends ChangeNotifier {
   void _saveRate() {
     final p = _prefs;
     if (p == null || rate == null) return;
+    PlatformBridge.updateWidget(rate: rate!, time: rateTime ?? DateTime.now());
     p.setDouble('rate', rate!);
     p.setInt('rateTime', rateTime!.millisecondsSinceEpoch);
     p.setInt('source', source.index);
@@ -232,6 +240,34 @@ class AppState extends ChangeNotifier {
     if (key == 'C') archiveExpr();
     expr = next;
     if (key == 'C') _loadedId = null;
+    notifyListeners();
+  }
+
+  // ---- 홈 화면 음성 팝업 ↔ 앱 ----
+
+  /// 팝업에서 "앱으로 이동": 하던 식을 앱이 이어받도록 저장
+  Future<void> handOffToApp() async {
+    await _prefs?.setString('handoff', expr);
+  }
+
+  /// 앱이 켜지거나 다시 보일 때: 팝업이 남긴 최근 계산·이어받을 식을 반영
+  Future<void> syncFromPopup() async {
+    final p = _prefs;
+    if (p == null || !loaded) return;
+    try {
+      await p.reload();
+    } catch (_) {}
+    history = CalcHistory.decode(p.getString('history'));
+    final h = p.getString('handoff');
+    if (h != null) {
+      await p.remove('handoff');
+      if (h.isNotEmpty && h != expr) {
+        archiveExpr();
+        expr = h;
+        editPart = null;
+        _loadedId = history.where((e) => e.expr == h).firstOrNull?.id;
+      }
+    }
     notifyListeners();
   }
 

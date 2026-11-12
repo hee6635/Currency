@@ -24,7 +24,7 @@ class ConvertPage extends StatelessWidget {
         _convertBody(),
         // 말로 입력한 뒤 3초 동안 크게 보여주는 확인 화면
         // 음성 모드: 네모 창이 떠 있고, 버튼을 누르고 있는 동안만 듣는다
-        const Positioned.fill(child: _VoicePanel()),
+        const Positioned.fill(child: VoicePanel()),
       ],
     );
   }
@@ -399,8 +399,12 @@ class _MicButtonState extends State<_MicButton>
 /// 음성 모드 창 (무전기 방식).
 /// 가운데 네모 창에 지금까지의 식과 합계가 크게 보이고,
 /// 아래 큰 버튼을 누르고 있는 동안만 듣는다. 떼면 반영.
-class _VoicePanel extends StatelessWidget {
-  const _VoicePanel();
+class VoicePanel extends StatelessWidget {
+  const VoicePanel({super.key, this.onClose, this.onOpenApp});
+
+  /// 홈 화면 위젯에서 띄운 창: 닫기와 "앱으로 이동"을 따로 처리한다
+  final VoidCallback? onClose;
+  final VoidCallback? onOpenApp;
 
   @override
   Widget build(BuildContext context) {
@@ -414,7 +418,7 @@ class _VoicePanel extends StatelessWidget {
         opacity: open ? 1 : 0,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: s.closeVoice, // 바깥 누르면 닫힘
+          onTap: onClose ?? s.closeVoice, // 바깥 누르면 닫힘
           child: Container(
             color: Colors.black.withValues(alpha: 0.55),
             alignment: Alignment.center,
@@ -480,7 +484,7 @@ class _VoicePanel extends StatelessWidget {
               FlagIcon(s.from, size: 22),
               const SizedBox(width: 8),
               Text(
-                '${s.from.name}으로 계산',
+                onOpenApp != null ? s.from.name : '${s.from.name}으로 계산',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -499,7 +503,7 @@ class _VoicePanel extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '+ 더하기 모드',
+                    onOpenApp != null ? '+ 더하기' : '+ 더하기 모드',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -508,14 +512,21 @@ class _VoicePanel extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
-              IconButton(
-                tooltip: '음성 입력 규칙',
-                onPressed: () => GuidePage.open(context, voiceFirst: true),
-                icon: Icon(Icons.help_outline_rounded, color: p.muted),
-              ),
+              if (onOpenApp != null)
+                _PanelPill(
+                  icon: Icons.open_in_new_rounded,
+                  label: '앱으로 이동',
+                  onTap: s.listening ? null : onOpenApp,
+                )
+              else
+                IconButton(
+                  tooltip: '음성 입력 규칙',
+                  onPressed: () => GuidePage.open(context, voiceFirst: true),
+                  icon: Icon(Icons.help_outline_rounded, color: p.muted),
+                ),
               IconButton(
                 tooltip: '닫기',
-                onPressed: s.closeVoice,
+                onPressed: onClose ?? s.closeVoice,
                 icon: Icon(Icons.close_rounded, color: p.muted),
               ),
             ],

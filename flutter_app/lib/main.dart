@@ -1,13 +1,23 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 
 import 'state/app_state.dart';
 import 'ui/convert_page.dart';
 import 'ui/other_pages.dart';
 import 'ui/theme.dart';
+import 'ui/voice_popup.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final state = AppState()..load();
+  final state = AppState();
+  // 홈 화면 위젯·측면 버튼으로 연 음성 창
+  if (PlatformDispatcher.instance.defaultRouteName == '/voice') {
+    state.load().then((_) => state.openVoice());
+    runApp(VoicePopupApp(state: state));
+    return;
+  }
+  state.load().then((_) => state.syncFromPopup());
   runApp(VnCurrencyApp(state: state));
 }
 
@@ -47,6 +57,8 @@ class _HomeShellState extends State<HomeShell> {
     // 앱이 백그라운드로 갈 때 메모를 바로 저장하고, 하던 계산은 최근 계산에 넣어 둔다
     // (다시 켜면 입력창은 비어 있고, 최근 계산에서 불러오면 이어서 할 수 있다)
     _life = AppLifecycleListener(
+      // 음성 팝업에서 "앱으로 이동"했거나 팝업에서 계산했으면 이어받는다
+      onResume: () => AppScope.read(context).syncFromPopup(),
       onHide: () {
         final s = AppScope.read(context);
         s.saveMemoNow();

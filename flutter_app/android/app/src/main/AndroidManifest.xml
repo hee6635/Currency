@@ -27,7 +27,60 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 앱 아이콘을 길게 누르면 "말로 입력" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- 홈 화면 위에 투명하게 뜨는 음성 입력 창 (위젯·측면 버튼·바로가기) -->
+        <activity
+            android:name=".VoicePopupActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="org.myapp.vn_currency.voice"
+            android:excludeFromRecents="true"
+            android:theme="@style/VoicePopupTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 앱 목록의 "말로 환율": 갤럭시 측면 버튼 두 번 누르기에 연결하면 바로 음성 창 -->
+        <activity-alias
+            android:name=".VoiceLauncher"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/voice_launcher_label"
+            android:targetActivity=".VoicePopupActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 홈 화면 위젯 -->
+        <receiver
+            android:name=".RateWidgetWide"
+            android:exported="false"
+            android:label="@string/widget_wide_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_wide_info" />
+        </receiver>
+        <receiver
+            android:name=".RateWidgetSquare"
+            android:exported="false"
+            android:label="@string/widget_square_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_square_info" />
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
