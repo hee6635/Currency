@@ -168,4 +168,14 @@ void main() {
     s.saveMemoNow();
     expect(prefs.getString('memo'), '야시장 가기\n쌀국수');
   });
+
+  testWidgets('아주 작은 화면에서도 키패드가 오류 없이 그려짐', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final s = await makeState();
+    await tester.pumpWidget(VnCurrencyApp(state: s));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+  });
 }

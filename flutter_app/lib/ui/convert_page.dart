@@ -35,7 +35,21 @@ class ConvertPage extends StatelessWidget {
         // 제목 없이: 왼쪽 환율, 오른쪽 음성 입력
         const Padding(
           padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: Row(children: [RateChip(), Spacer(), _MicButton()]),
+          // 아주 좁은 화면(폴드 바깥 화면 등)에서는 환율 칩이 조금 작아진다
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: RateChip(),
+                ),
+              ),
+              SizedBox(width: 8),
+              _MicButton(),
+            ],
+          ),
         ),
         Expanded(
           child: LayoutBuilder(
@@ -1073,7 +1087,11 @@ class Keypad extends StatelessWidget {
         final w = box.maxWidth, h = box.maxHeight;
         final rows = _rows.length;
         final d = math.min(w / (4 + 3 * 0.2), h / (rows + (rows - 1) * 0.32));
-        final vGap = ((h - rows * d) / (rows - 1)).clamp(6.0, d * 0.45);
+        // 아주 작은 화면에서는 d*0.45 가 6보다 작아질 수 있어 아래 한도도 같이 줄인다
+        final maxGap = math.max(0.0, d * 0.45);
+        final vGap = ((h - rows * d) / (rows - 1))
+            .clamp(math.min(6.0, maxGap), maxGap)
+            .toDouble();
         final wide = (w - 3 * 0.2 * d) / 4 > d * 1.3;
         final keyW = wide
             ? math.min((w * 0.88 - 3 * 0.4 * d) / 4, d * 1.75)
