@@ -237,9 +237,11 @@ class AppState extends ChangeNotifier {
     }
     final next = applyKey(expr, key);
     if (next == expr) return;
-    if (key == 'C') archiveExpr();
+    // C(지우기)나 =(합치기) 전의 식은 최근 계산에 남긴다 (금액별 내역이 사라지지 않게)
+    final archive = key == 'C' || (key == '=' && hasOperator(expr));
+    if (archive) archiveExpr();
     expr = next;
-    if (key == 'C') _loadedId = null;
+    if (archive) _loadedId = null;
     notifyListeners();
   }
 

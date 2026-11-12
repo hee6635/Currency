@@ -102,4 +102,15 @@ void main() {
     expect(CalcHistory.decode('망가진 값'), isEmpty);
     expect(CalcHistory.decode(null), isEmpty);
   });
+
+  test('= 로 합쳐도 합치기 전 식은 최근 계산에 남음', () async {
+    final s = await makeState();
+    s.expr = '50000+30000';
+    s.press('=');
+    expect(s.expr, '80000');
+    expect(s.history.first.expr, '50000+30000');
+    // 숫자 하나뿐이면 = 는 남길 게 없음
+    s.press('=');
+    expect(s.history.length, 1);
+  });
 }

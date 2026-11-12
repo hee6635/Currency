@@ -214,23 +214,82 @@ class TermsView extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: SizedBox(
               width: box.maxWidth,
-              // 왼쪽 끝은 흐리게 사라지게 (밀면 더 있다는 표시)
-              child: ShaderMask(
-                shaderCallback: (r) => const LinearGradient(
-                  colors: [Colors.transparent, Colors.black],
-                  stops: [0, 0.12],
-                ).createShader(r),
-                blendMode: BlendMode.dstIn,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
-                  child: child,
-                ),
-              ),
+              child: _EdgeScroll(child: child),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// 좌우로 밀어 보는 금액 줄. 앞쪽이 더 있으면 왼쪽 끝을 흐리게 하고,
+/// 맨 앞까지 밀면 흐림이 사라져 첫 금액이 또렷하게 보인다. 끝에서는 스프링처럼 튕긴다.
+class _EdgeScroll extends StatefulWidget {
+  const _EdgeScroll({required this.child});
+  final Widget child;
+
+  @override
+  State<_EdgeScroll> createState() => _EdgeScrollState();
+}
+
+class _EdgeScrollState extends State<_EdgeScroll> {
+  final _ctrl = ScrollController();
+  bool _moreOnLeft = true;
+
+  void _update() {
+    if (!_ctrl.hasClients) return;
+    final pos = _ctrl.position;
+    // reverse: true 라서 오른쪽(최근)이 0, 맨 왼쪽(처음)이 maxScrollExtent
+    final more = pos.pixels < pos.maxScrollExtent - 1;
+    if (more != _moreOnLeft) setState(() => _moreOnLeft = more);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_update);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
+  }
+
+  @override
+  void didUpdateWidget(_EdgeScroll old) {
+    super.didUpdateWidget(old);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scroll = SingleChildScrollView(
+      controller: _ctrl,
+      scrollDirection: Axis.horizontal,
+      reverse: true,
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      child: widget.child,
+    );
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: _moreOnLeft ? 0.12 : 0.0),
+      duration: const Duration(milliseconds: 180),
+      // 위젯 모양을 바꾸지 않아야 밀어 둔 위치가 그대로 남는다 → 흐림 폭만 바꾼다
+      builder: (context, fade, child) => ShaderMask(
+        shaderCallback: (r) => LinearGradient(
+          colors: fade <= 0.001
+              ? const [Colors.black, Colors.black]
+              : const [Colors.transparent, Colors.black],
+          stops: [0, fade <= 0.001 ? 1 : fade],
+        ).createShader(r),
+        blendMode: BlendMode.dstIn,
+        child: child,
+      ),
+      child: scroll,
     );
   }
 }

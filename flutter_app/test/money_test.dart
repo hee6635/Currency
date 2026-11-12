@@ -172,11 +172,12 @@ void main() {
       expect(say('50000+30000', '지워 오천').expr, '50000+5000');
     });
 
-    test('얼마 / 결과', () {
+    test('얼마 / 결과 는 무시 (식을 합치지 않음)', () {
       final r = say('50000+30000', '얼마');
-      expect(r.expr, '80000');
-      expect(r.headline, '= 80,000');
-      expect(say('', '삼만 곱하기 사 결과').expr, '120000');
+      expect(r.expr, '50000+30000');
+      expect(r.changed, isFalse);
+      expect(r.message, contains('합계'));
+      expect(say('', '삼만 곱하기 사 결과').expr, '30000×4');
     });
 
     test('원/동은 무시 (방향 안 바꿈)', () {
@@ -219,7 +220,7 @@ void main() {
       expect(say('오만 배기 삼천'), '50000−3000');
       expect(say('오만 더 하기 삼천'), '50000+3000');
       expect(say('십만 나눠 4'), '100000÷4');
-      expect(say('오만 플러스 삼만 얼마야'), '80000');
+      expect(say('오만 플러스 삼만 얼마야'), '50000+30000');
       expect(say('치워', e: '50000+3000'), '50000+');
       expect(say('전부 지워', e: '50000+3000'), '');
       expect(say('처음부터', e: '50000'), '');

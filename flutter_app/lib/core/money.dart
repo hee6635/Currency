@@ -550,7 +550,7 @@ class VoiceStep {
 /// - 말한 숫자는 남아 있고, 이어서 말하면 이어 붙는다 ("오만" → "더하기 삼만").
 /// - 숫자 뒤에 또 숫자만 말하면: 더하기 모드면 더하고, 아니면 안내만.
 /// - "지워": 마지막 덩어리 하나, "다 지워"/"새로": 전부.
-/// - "얼마"/"결과": = 를 누른 것처럼 합친다.
+/// - "얼마"/"결과": 무시 (합계는 늘 보이므로 식을 합치지 않는다).
 /// - "원"/"동"은 무시한다 (방향은 화면에서만 바꾼다).
 VoiceStep applySpoken(String expr, String raw, {required bool addMode}) {
   final text = normalizeSpoken(raw);
@@ -632,9 +632,9 @@ VoiceStep applySpoken(String expr, String raw, {required bool addMode}) {
   }
   if (deleted.isNotEmpty && b.isNotEmpty) headline = '$deleted · $headline';
 
-  if (wantsResult && e.isNotEmpty) {
-    e = applyKey(e, '=');
-    headline = e.isEmpty ? '계산할 수 없어요' : '= ${fmt(int.parse(e))}';
+  // "얼마"·"결과"는 식을 합치지 않는다 (합계는 결과 카드에 늘 보이고, 금액별 내역을 지키려고)
+  if (wantsResult && headline.isEmpty) {
+    return VoiceStep(expr, '', message: '합계는 아래 결과에 늘 보여요');
   }
   if (e.length > 48) return VoiceStep(expr, '', message: '식이 너무 길어요');
   return VoiceStep(e, headline);
