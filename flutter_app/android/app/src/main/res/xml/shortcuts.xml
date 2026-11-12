@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_mic"
+        android:shortcutId="voice"
+        android:shortcutShortLabel="@string/shortcut_voice">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="org.myapp.vn_currency.VoicePopupActivity"
+            android:targetPackage="org.myapp.vn_currency" />
+    </shortcut>
+</shortcuts>
