@@ -1,6 +1,9 @@
 package org.myapp.vn_currency
 
+import android.os.Build
+import android.os.Bundle
 import android.view.KeyEvent
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode
 import io.flutter.embedding.engine.FlutterEngine
@@ -12,6 +15,21 @@ import io.flutter.embedding.engine.FlutterEngine
  */
 class VoicePopupActivity : FlutterActivity() {
     private var bridge: AppBridge? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // 잠금 화면 위에도 뜬다 (잠금을 풀지 않고 말로 계산). 앱 안쪽은 "앱으로 이동"에서 잠금 해제 후.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
+            )
+        }
+        super.onCreate(savedInstanceState)
+    }
 
     override fun getInitialRoute(): String = "/voice"
 

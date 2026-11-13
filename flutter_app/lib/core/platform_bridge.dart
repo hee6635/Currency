@@ -23,8 +23,16 @@ class PlatformBridge {
     'time': time.millisecondsSinceEpoch,
   });
 
-  /// 음성 팝업 창에서 전체 앱 열기
-  static Future<void> openMainApp() => _call('openMainApp');
+  /// 음성 팝업 창에서 전체 앱 열기.
+  /// 잠금 화면 위라면 잠금 해제를 먼저 물어보고, 풀리면 안드로이드가 앱을 열고 창을 닫는다
+  /// → 그때는 false (창을 직접 닫지 말 것).
+  static Future<bool> openMainApp() async {
+    try {
+      return await _ch.invokeMethod<bool>('openMainApp') ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
 
   /// 음성 팝업 창 닫기
   static Future<void> closePopup() => _call('closePopup');

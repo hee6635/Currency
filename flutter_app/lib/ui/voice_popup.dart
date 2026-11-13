@@ -44,10 +44,12 @@ class _PopupPage extends StatelessWidget {
     }
 
     Future<void> openApp() async {
-      s.closeVoice();
       s.archiveExpr();
       await s.handOffToApp(); // 앱이 이 식을 이어받는다
-      await PlatformBridge.openMainApp();
+      // 잠금 화면 위면 잠금 해제를 물어본다. 풀리면 안드로이드가 앱을 열고 이 창을 닫는다.
+      final opened = await PlatformBridge.openMainApp();
+      if (!opened) return;
+      s.closeVoice();
       await PlatformBridge.closePopup();
     }
 

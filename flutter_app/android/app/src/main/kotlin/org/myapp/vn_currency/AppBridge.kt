@@ -1,8 +1,10 @@
 package org.myapp.vn_currency
 
 import android.app.Activity
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.view.KeyEvent
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -40,13 +42,20 @@ class AppBridge(engine: FlutterEngine, private val activity: Activity) {
                     result.success(null)
                 }
                 "openMainApp" -> {
-                    // 런처에서 누른 것처럼: 앱이 이미 떠 있으면 그 화면을 앞으로
-                    val i = Intent(activity, MainActivity::class.java)
-                        .setAction(Intent.ACTION_MAIN)
-                        .addCategory(Intent.CATEGORY_LAUNCHER)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                    activity.startActivity(i)
-                    result.success(null)
+                    val km = activity.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                    if (km.isKeyguardLocked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        // 잠금 화면 위의 음성 창: 잠금을 풀어야 앱 안쪽(메모 등)을 연다
+                        km.requestDismissKeyguard(activity, object : KeyguardManager.KeyguardDismissCallback() {
+                            override fun onDismissSucceeded() {
+                                startMainApp()
+                                activity.finish()
+                            }
+                        })
+                        result.success(false)
+                    } else {
+                        startMainApp()
+                        result.success(true)
+                    }
                 }
                 "closePopup" -> {
                     result.success(null)
@@ -55,6 +64,15 @@ class AppBridge(engine: FlutterEngine, private val activity: Activity) {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /** 런처에서 누른 것처럼: 앱이 이미 떠 있으면 그 화면을 앞으로 */
+    private fun startMainApp() {
+        val i = Intent(activity, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_LAUNCHER)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        activity.startActivity(i)
     }
 
     /** 처리했으면 true (그 버튼은 소리 조절에 쓰지 않음) */
