@@ -221,3 +221,34 @@ class _PressableKeyState extends State<PressableKey>
     );
   }
 }
+
+/// 누르는 동안 살짝 작아졌다가 떼면 돌아오는 포장 (카드 복사 같은 동작의 손맛)
+class PressScale extends StatefulWidget {
+  const PressScale({super.key, required this.child, this.enabled = true});
+  final Widget child;
+  final bool enabled;
+
+  @override
+  State<PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<PressScale> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: widget.enabled
+          ? (_) => setState(() => _down = true)
+          : null,
+      onPointerUp: (_) => setState(() => _down = false),
+      onPointerCancel: (_) => setState(() => _down = false),
+      child: AnimatedScale(
+        scale: _down ? 0.97 : 1,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
+  }
+}

@@ -76,29 +76,36 @@ void main() {
     expect(s.expr, '50000');
   });
 
-  test('입력창에서 중간 금액을 골라 고치기', () async {
+  test('입력창에서 숫자 하나를 골라 고치기', () async {
     final s = await makeState();
-    s.expr = '50000+30000+20000';
-    s.selectPart(1);
-    expect(s.editPart, 1);
+    s.expr = '50000+30000+20000'; // 토큰: 0 + 2 + 4
+    s.selectTok(2);
+    expect(s.editTok, 2);
+    expect(s.selectedNumber, 30000);
     s.press('back');
     s.press('back');
     expect(s.expr, '50000+300+20000');
     s.press('00');
     expect(s.expr, '50000+30000+20000');
-    // +는 맨 끝에 새 금액
-    s.press('+');
-    expect(s.editPart, isNull);
-    expect(s.expr, '50000+30000+20000+');
-    // 마지막 금액을 고르면 그냥 맨 끝
-    s.selectPart(3);
-    expect(s.editPart, isNull);
-    // 중간 금액을 다 지우면 빠짐
+    s.press('×');
+    expect(s.editPending, 4);
+    s.press('2');
+    expect(s.expr, '50000+30000×2+20000');
+    expect(s.editTok, 4);
+    s.selectTok(null);
+    expect(s.editTok, isNull);
+    s.selectTok(6); // 마지막 숫자 → 맨 끝
+    expect(s.editTok, isNull);
+    s.selectTok(0);
+    s.press('÷');
+    expect(s.expr, '50000÷+30000×2+20000');
+    s.selectTok(null); // 자리만 만들고 다른 곳을 누르면 걸린 연산자 정리
+    expect(s.expr, '50000+30000×2+20000');
     s.expr = '50000+3+20000';
-    s.selectPart(1);
+    s.selectTok(2);
     s.press('back');
     expect(s.expr, '50000+20000');
-    expect(s.editPart, 0); // 바로 앞 금액(50,000)으로 커서가 감
+    expect(s.editTok, 0);
   });
 
   test('지폐 합계', () async {
@@ -177,5 +184,17 @@ void main() {
     await tester.pumpWidget(VnCurrencyApp(state: s));
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
+  });
+
+  test('환율이 2일 넘게 지나면 오래됐다고 표시', () async {
+    final s = await makeState();
+    s.rateTime = DateTime.now();
+    expect(s.rateStale, isFalse);
+    s.rateTime = DateTime.now().subtract(const Duration(days: 3));
+    expect(s.rateStale, isTrue);
+    expect(s.rateAgeText, '3일 전 환율');
+    s.rateTime = DateTime.now().subtract(const Duration(hours: 5));
+    expect(s.rateStale, isFalse);
+    expect(s.rateAgeText, isNull);
   });
 }

@@ -124,96 +124,143 @@ List<(String sign, double? value)> exprTerms(String expr) {
   return out;
 }
 
-/// 화면에 줄 맞춰 보여줄 항목: 부호, 보기 좋은 글자("30,000 × 2"), 계산한 값
-/// 끝에 연산자만 남았으면 trailing 에 담는다.
-(List<(String sign, String text, double? value)>, String trailing) exprParts(
-  String expr,
-) {
+/// 화면에 줄 맞춰 보여줄 항목 하나 (더하기·빼기로 나뉜 덩어리)
+class ExprPart {
+  const ExprPart(this.sign, this.pieces, this.value);
+
+  /// 이 항목 앞의 부호 (+ 또는 −)
+  final String sign;
+
+  /// 이 항목을 이루는 토큰들: (토큰 번호, 보기 좋은 글자). 숫자는 "30,000", 연산은 "×"
+  final List<(int tok, String text)> pieces;
+
+  /// 계산한 값 (0으로 나누면 null)
+  final double? value;
+
+  String get text =>
+      pieces.map((x) => isOperator(x.$2) ? ' ${x.$2} ' : x.$2).join();
+}
+
+bool isOperator(String t) => operators.contains(t);
+
+/// 수식의 토큰들: 숫자와 연산자가 번갈아 나온다
+List<String> exprTokens(String expr) => _tokens(expr);
+
+String joinTokens(List<String> t) => t.join();
+
+/// 화면에 줄 맞춰 보여줄 항목들과, 끝에 연산자만 남았으면 그 연산자
+(List<ExprPart>, String trailing) exprParts(String expr) {
   final t = _tokens(expr);
   var trailing = '';
   if (t.isNotEmpty && operators.contains(t.last)) trailing = t.removeLast();
   final values = exprTerms(expr);
-  final out = <(String, String, double?)>[];
-  var buf = <String>[];
+  final out = <ExprPart>[];
+  var buf = <(int, String)>[];
   var sign = opAdd;
   void flush() {
     if (buf.isEmpty) return;
     final i = out.length;
-    out.add((
-      sign,
-      buf.map((x) => operators.contains(x) ? ' $x ' : fmt(int.parse(x))).join(),
-      i < values.length ? values[i].$2 : null,
-    ));
+    out.add(ExprPart(sign, buf, i < values.length ? values[i].$2 : null));
     buf = [];
   }
 
-  for (final x in t) {
+  for (var i = 0; i < t.length; i++) {
+    final x = t[i];
     if (x == opAdd || x == opSub) {
       flush();
       sign = x;
     } else {
-      buf.add(x);
+      buf.add((i, isOperator(x) ? x : fmt(int.parse(x))));
     }
   }
   flush();
   return (out, trailing);
 }
 
-/// 더하기·빼기로 나뉜 항목의 원래 글자: "50000+30000×2+" → ([(+,"50000"),(+,"30000×2")], "+")
-(List<(String sign, String raw)>, String trailing) _rawParts(String expr) {
-  final out = <(String, String)>[];
-  var sign = opAdd;
-  var buf = StringBuffer();
-  var trailing = '';
+/// 입력창에서 숫자 하나를 골라 고칠 때의 상태
+/// [tok]: 고르는 숫자의 토큰 번호 (null이면 맨 끝에 이어 쓰기)
+/// [pending]: 고른 숫자 뒤에 ×÷+− 를 눌러 새 숫자가 들어갈 자리 (토큰 번호). 그 앞 토큰이 방금 넣은 연산자
+typedef EditSel = ({String expr, int? tok, int? pending});
+
+/// 고른 숫자에만 키를 적용한다. 숫자·00·000·⌫·×÷+− 만 여기서 처리하고, C·= 는 null.
+EditSel? editToken(String expr, int? tok, int? pending, String key) {
+  if (key == 'C' || key == '=' || key == 'K') return null;
   final t = _tokens(expr);
-  for (var i = 0; i < t.length; i++) {
-    final x = t[i];
-    if (x == opAdd || x == opSub) {
-      if (i == t.length - 1) {
-        trailing = x;
-        break;
-      }
-      if (buf.isNotEmpty) out.add((sign, buf.toString()));
-      buf = StringBuffer();
-      sign = x;
-    } else {
-      buf.write(x);
+  final isDigit = RegExp(r'^\d+$').hasMatch(key);
+
+  // 방금 넣은 연산자 뒤에 새 숫자를 기다리는 중
+  if (pending != null) {
+    if (pending < 1 || pending > t.length) return null;
+    if (isDigit) {
+      final n = applyKey('', key);
+      if (n.isEmpty) return (expr: expr, tok: tok, pending: pending);
+      t.insert(pending, n);
+      return _after(t, pending, null);
     }
+    if (isOperator(key)) {
+      t[pending - 1] = key;
+      return (expr: joinTokens(t), tok: tok, pending: pending);
+    }
+    if (key == 'back') {
+      t.removeAt(pending - 1);
+      return _after(t, pending - 2, null);
+    }
+    return null;
   }
-  if (buf.isNotEmpty) out.add((sign, buf.toString()));
-  return (out, trailing);
+
+  if (tok == null || tok < 0 || tok >= t.length || isOperator(t[tok])) {
+    return null;
+  }
+  if (isDigit) {
+    final n = applyKey(t[tok], key);
+    if (n == t[tok]) return (expr: expr, tok: tok, pending: null);
+    t[tok] = n;
+    return _after(t, tok, null);
+  }
+  if (key == 'back') {
+    final n = t[tok].substring(0, t[tok].length - 1);
+    if (n.isNotEmpty) {
+      t[tok] = n;
+      return _after(t, tok, null);
+    }
+    // 숫자가 비면 통째로 빼고, 붙어 있던 연산자도 뺀다 → 앞 숫자로
+    if (tok > 0) {
+      t.removeRange(tok - 1, tok + 1);
+      return _after(t, tok - 2, null);
+    }
+    t.removeAt(0);
+    if (t.isNotEmpty) t.removeAt(0);
+    return _after(t, null, null);
+  }
+  if (isOperator(key)) {
+    if (tok == t.length - 1) {
+      // 마지막 숫자면 평소처럼 끝에 붙인다
+      return (expr: applyKey(expr, key), tok: null, pending: null);
+    }
+    t.insert(tok + 1, key);
+    return (expr: joinTokens(t), tok: tok, pending: tok + 2);
+  }
+  return null;
 }
 
-/// 입력창에서 중간 항목을 골라 고칠 때: 그 항목에만 키를 적용한다.
-/// (새 수식, 계속 고칠 항목). 그 항목에서 처리할 키가 아니면(+, − 등) null.
-/// ⌫로 항목이 비면 그 항목을 통째로 빼고 앞 항목으로 간다.
-(String, int?)? editInPart(String expr, int part, String key) {
-  if (key == opAdd || key == opSub || key == 'C' || key == '=') return null;
-  final (parts, trailing) = _rawParts(expr);
-  if (part < 0 || part >= parts.length) return null;
-  final (sign, raw) = parts[part];
-  final list = [...parts];
-  int? next = part;
-  if (key == 'back') {
-    final r = raw.substring(0, raw.length - 1);
-    if (r.isEmpty) {
-      list.removeAt(part);
-      next = part > 0 ? part - 1 : null;
-    } else {
-      list[part] = (sign, r);
+/// 고르기가 맨 마지막 숫자를 가리키면 그냥 끝에 이어 쓰기(null)로
+EditSel _after(List<String> t, int? tok, int? pending) {
+  final last = tok != null && tok >= t.length - 1;
+  return (expr: joinTokens(t), tok: last ? null : tok, pending: pending);
+}
+
+/// 중간에 걸린 연산자("8000×+2500"의 ×)를 정리한다 (고르기를 풀 때)
+String cleanExpr(String expr) {
+  final t = _tokens(expr);
+  final out = <String>[];
+  for (final x in t) {
+    if (isOperator(x) && out.isNotEmpty && isOperator(out.last)) {
+      out.removeLast();
     }
-  } else {
-    final r = applyKey(raw, key);
-    if (r == raw) return (expr, part);
-    list[part] = (sign, r);
+    if (isOperator(x) && out.isEmpty) continue;
+    out.add(x);
   }
-  final b = StringBuffer();
-  for (var i = 0; i < list.length; i++) {
-    if (i > 0) b.write(list[i].$1);
-    b.write(list[i].$2);
-  }
-  if (list.isNotEmpty) b.write(trailing);
-  return (b.toString(), list.isEmpty ? null : next);
+  return joinTokens(out);
 }
 
 /// 수식을 보기 좋게: "150000+2000" → "150,000 + 2,000"

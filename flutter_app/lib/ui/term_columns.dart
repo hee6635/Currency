@@ -19,15 +19,19 @@ class TermColumns extends StatelessWidget {
     this.cursor = false,
     this.highlightLast = false,
     this.total,
-    this.editPart,
-    this.onTapPart,
+    this.editTok,
+    this.pendingTok,
+    this.onTapTok,
   });
 
-  /// 골라서 고치는 중인 항목 (커서와 금색 바탕이 그 항목에)
-  final int? editPart;
+  /// 골라서 고치는 중인 숫자의 토큰 번호 (커서와 금색 바탕이 그 숫자에)
+  final int? editTok;
 
-  /// 항목을 눌렀을 때
-  final void Function(int index)? onTapPart;
+  /// 고른 숫자 뒤에 방금 넣은 연산자가 있을 때 그 연산자 토큰 번호 (커서가 그 뒤에)
+  final int? pendingTok;
+
+  /// 숫자를 눌렀을 때 (토큰 번호)
+  final void Function(int tok)? onTapTok;
 
   final String expr;
   final Currency from;
@@ -118,32 +122,89 @@ class TermColumns extends StatelessWidget {
             : Text('0', style: top.copyWith(color: p.muted)),
       );
     }
+    // 숫자가 추가되거나 바뀔 때 살짝 올라오며 나타난다
+    Widget pop(Key key, Widget child) => _PopIn(key: key, child: child);
+
     for (var i = 0; i < parts.length; i++) {
-      final (sign, text, v) = parts[i];
+      final part = parts[i];
       final last = i == parts.length - 1;
-      if (i > 0 || sign == opSub) cells.add(gap(sign));
-      final editing = editPart == i;
-      final cursorHere =
-          cursor && (editPart == null ? last && trailing.isEmpty : editing);
-      final topW = cursorHere
-          ? AnimatedNumberText(text, cursorColor: p.gold, style: top)
-          : Text(text, style: top);
-      Widget cell = col(
-        topW,
-        Text(
-          v == null || convert == null ? '—' : fmt(convert!(v)),
-          style: bottom,
-        ),
-        hi: editing || (last && highlightLast && parts.length > 1),
+      if (i > 0 || part.sign == opSub) cells.add(gap(part.sign));
+      final editingHere = part.pieces.any(
+        (x) => x.$1 == editTok || x.$1 == pendingTok,
       );
-      if (onTapPart != null) {
-        cell = GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => onTapPart!(i),
-          child: cell,
-        );
-      }
-      cells.add(cell);
+      final lastNumTok = part.pieces.last.$1;
+      // 항목 안의 숫자·×÷ 를 하나씩 그린다 (숫자는 따로 누를 수 있다)
+      final topRow = Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          for (final (tok, text) in part.pieces)
+            if (isOperator(text))
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: topSize * 0.18),
+                child: tok == pendingTok && cursor
+                    ? AnimatedNumberText(
+                        text,
+                        cursorColor: p.gold,
+                        style: opTop,
+                      )
+                    : Text(text, style: opTop),
+              )
+            else
+              Builder(
+                builder: (context) {
+                  final selected = tok == editTok;
+                  final cursorHere =
+                      cursor &&
+                      (editTok == null && pendingTok == null
+                          ? last && trailing.isEmpty && tok == lastNumTok
+                          : selected);
+                  Widget w = cursorHere
+                      ? AnimatedNumberText(
+                          text,
+                          cursorColor: p.gold,
+                          style: top,
+                        )
+                      : pop(ValueKey('n$tok$text'), Text(text, style: top));
+                  if (selected) {
+                    w = Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: p.gold.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: w,
+                    );
+                  }
+                  if (onTapTok != null) {
+                    w = GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onTapTok!(tok),
+                      child: w,
+                    );
+                  }
+                  return w;
+                },
+              ),
+        ],
+      );
+      final v = part.value;
+      cells.add(
+        col(
+          topRow,
+          pop(
+            ValueKey('v$i${v ?? ''}'),
+            Text(
+              v == null || convert == null ? '—' : fmt(convert!(v)),
+              style: bottom,
+            ),
+          ),
+          hi:
+              (editingHere && editTok == null && pendingTok != null) ||
+              (last && highlightLast && parts.length > 1 && editTok == null),
+        ),
+      );
     }
     if (trailing.isNotEmpty) {
       cells.add(
@@ -290,6 +351,30 @@ class _EdgeScrollState extends State<_EdgeScroll> {
         child: child,
       ),
       child: scroll,
+    );
+  }
+}
+
+/// 새 값이 나타날 때 살짝 아래에서 올라오며 밝아진다 (키가 바뀌면 다시 재생)
+class _PopIn extends StatelessWidget {
+  const _PopIn({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: key,
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 6),
+          child: child,
+        ),
+      ),
     );
   }
 }

@@ -211,29 +211,54 @@ class AppState extends ChangeNotifier {
 
   // ---- 환산 ----
 
-  /// 입력창에서 골라 고치고 있는 항목 (null이면 맨 끝에 이어 쓰기)
-  int? editPart;
+  /// 입력창에서 골라 고치고 있는 숫자의 토큰 번호 (null이면 맨 끝에 이어 쓰기)
+  int? editTok;
 
-  void selectPart(int? i) {
-    final n = exprParts(expr).$1.length;
+  /// 고른 숫자 뒤에 연산자를 눌러 새 숫자를 기다리는 자리
+  int? editPending;
+
+  /// 고른 숫자 (없으면 null)
+  int? get selectedNumber {
+    final t = editTok;
+    if (t == null) return null;
+    final toks = exprTokens(expr);
+    if (t < 0 || t >= toks.length || isOperator(toks[t])) return null;
+    return int.tryParse(toks[t]);
+  }
+
+  void selectTok(int? i) {
+    if (editPending != null) {
+      expr = cleanExpr(expr);
+      editPending = null;
+    }
+    final n = exprTokens(expr).length;
     final v = (i == null || i >= n - 1) ? null : i;
-    if (v == editPart) return;
-    editPart = v;
+    if (v == editTok) {
+      notifyListeners();
+      return;
+    }
+    editTok = v;
     notifyListeners();
   }
 
+  void _clearEdit() {
+    if (editPending != null) expr = cleanExpr(expr);
+    editTok = null;
+    editPending = null;
+  }
+
   void press(String key) {
-    if (editPart != null) {
-      final r = editInPart(expr, editPart!, key);
+    if (editTok != null || editPending != null) {
+      final r = editToken(expr, editTok, editPending, key);
       if (r != null) {
-        expr = r.$1;
-        final n = exprParts(expr).$1.length;
-        editPart = (r.$2 == null || r.$2! >= n - 1) ? null : r.$2;
+        expr = r.expr;
+        editTok = r.tok;
+        editPending = r.pending;
         notifyListeners();
         return;
       }
-      // +, −, =, C 는 평소처럼 맨 끝에서
-      editPart = null;
+      // C, = 는 평소처럼 맨 끝에서
+      _clearEdit();
     }
     final next = applyKey(expr, key);
     if (next == expr) return;
@@ -266,7 +291,7 @@ class AppState extends ChangeNotifier {
       if (h.isNotEmpty && h != expr) {
         archiveExpr();
         expr = h;
-        editPart = null;
+        _clearEdit();
         _loadedId = history.where((e) => e.expr == h).firstOrNull?.id;
       }
     }
@@ -301,7 +326,7 @@ class AppState extends ChangeNotifier {
     if (_loadedId != e.id) archiveExpr();
     final still = history.where((h) => h.id == e.id).firstOrNull ?? e;
     expr = still.expr;
-    editPart = null;
+    _clearEdit();
     _loadedId = still.id;
     notifyListeners();
   }
@@ -310,7 +335,7 @@ class AppState extends ChangeNotifier {
     final digits = parsePasted(text);
     if (digits == null) return false;
     expr = digits;
-    editPart = null;
+    _clearEdit();
     notifyListeners();
     return true;
   }
@@ -339,7 +364,7 @@ class AppState extends ChangeNotifier {
   void openVoice() {
     voiceMode = true;
     _syncVolumeKeys();
-    editPart = null; // 말은 늘 맨 끝에 붙는다
+    _clearEdit(); // 말은 늘 맨 끝에 붙는다
     notice = null;
     notifyListeners();
   }
@@ -660,7 +685,7 @@ class AppState extends ChangeNotifier {
       _loadedId = null;
     }
     expr = step.expr;
-    editPart = null;
+    _clearEdit();
     _showNotice(step.headline);
     notifyListeners();
     return step.message;
@@ -671,7 +696,7 @@ class AppState extends ChangeNotifier {
     final (rest, tok) = removeLastToken(expr);
     if (tok.isEmpty) return;
     expr = rest;
-    editPart = null;
+    _clearEdit();
     _showNotice('${operators.contains(tok) ? tok : fmt(int.parse(tok))} 지움');
     notifyListeners();
   }
@@ -684,7 +709,7 @@ class AppState extends ChangeNotifier {
     _undoId = _loadedId;
     _loadedId = null;
     expr = '';
-    editPart = null;
+    _clearEdit();
     _showNotice('전부 지움');
     notifyListeners();
     return before;
@@ -694,7 +719,7 @@ class AppState extends ChangeNotifier {
 
   void restoreExpr(String e) {
     expr = e;
-    editPart = null;
+    _clearEdit();
     // 되돌린 식은 방금 저장한 칸과 같은 것 → 다시 지워도 칸이 늘지 않게
     _loadedId = _undoId;
     _showNotice('되돌림');
@@ -730,6 +755,18 @@ class AppState extends ChangeNotifier {
     final v = inputValue;
     if (v == null || rate == null) return null;
     return convert(v, from);
+  }
+
+  /// 받은 지 2일이 넘은 환율 (인터넷 없이 며칠 쓰면 알려주려고)
+  bool get rateStale =>
+      rateTime != null && DateTime.now().difference(rateTime!).inDays >= 2;
+
+  /// "3일 전 환율"처럼 얼마나 지났는지. 하루 안이면 null
+  String? get rateAgeText {
+    final t = rateTime;
+    if (t == null) return null;
+    final d = DateTime.now().difference(t).inDays;
+    return d < 1 ? null : '$d일 전 환율';
   }
 
   double convert(num amount, Currency src) =>

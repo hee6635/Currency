@@ -285,46 +285,88 @@ void main() {
 
   test('exprParts — 줄 맞춰 보여줄 항목', () {
     final (parts, trailing) = exprParts('150000+30000×2−5000+');
-    expect(parts.map((x) => x.$2), ['150,000', '30,000 × 2', '5,000']);
-    expect(parts.map((x) => x.$1), [opAdd, opAdd, opSub]);
-    expect(parts.map((x) => x.$3), [150000.0, 60000.0, 5000.0]);
+    expect(parts.map((x) => x.text), ['150,000', '30,000 × 2', '5,000']);
+    expect(parts.map((x) => x.sign), [opAdd, opAdd, opSub]);
+    expect(parts.map((x) => x.value), [150000.0, 60000.0, 5000.0]);
+    // 숫자마다 토큰 번호: 150000=0, 30000=2, ×=3, 2=4, 5000=6
+    expect(parts[1].pieces.map((x) => x.$1), [2, 3, 4]);
     expect(trailing, opAdd);
     expect(exprParts('').$1, isEmpty);
   });
 
-  group('editInPart — 중간 금액 고치기', () {
-    test('그 금액에만 숫자·지우기', () {
-      const e = '50000+30000+20000';
-      expect(editInPart(e, 1, 'back'), ('50000+3000+20000', 1));
-      expect(editInPart(e, 1, '5'), ('50000+300005+20000', 1));
-      expect(editInPart(e, 0, '000'), ('50000000+30000+20000', 0));
+  group('editToken — 숫자 하나씩 골라 고치기', () {
+    // 토큰: 50000(0) +(1) 8000(2) ×(3) 2(4) +(5) 2500(6)
+    const e = '50000+8000×2+2500';
+    test('그 숫자에만 숫자·지우기', () {
+      expect(editToken(e, 4, null, '5'), (
+        expr: '50000+8000×25+2500',
+        tok: 4,
+        pending: null,
+      ));
+      expect(editToken(e, 2, null, 'back'), (
+        expr: '50000+800×2+2500',
+        tok: 2,
+        pending: null,
+      ));
+      expect(editToken(e, 0, null, '000'), (
+        expr: '50000000+8000×2+2500',
+        tok: 0,
+        pending: null,
+      ));
     });
 
-    test('다 지우면 그 금액이 통째로 빠지고 앞 금액으로', () {
-      var (e, p) = ('50000+3+20000', 1 as int?);
-      (e, p) = editInPart(e, p!, 'back')!;
-      expect(e, '50000+20000');
-      expect(p, 0);
-      // 첫 금액을 다 지우면 다음 금액이 맨 앞이 됨
-      expect(editInPart('5+20000', 0, 'back'), ('20000', null));
+    test('다 지우면 그 숫자와 붙은 연산자가 빠지고 앞 숫자로', () {
+      expect(editToken('50000+8+2500', 2, null, 'back'), (
+        expr: '50000+2500',
+        tok: 0,
+        pending: null,
+      ));
+      expect(editToken('50000+8000×2+2500', 4, null, 'back'), (
+        expr: '50000+8000+2500',
+        tok: 2,
+        pending: null,
+      ));
+      expect(editToken('5+2500', 0, null, 'back'), (
+        expr: '2500',
+        tok: null,
+        pending: null,
+      ));
     });
 
-    test('곱하기도 그 금액에', () {
-      final (e, _) = editInPart('50000+30000+20000', 1, '×')!;
-      expect(e, '50000+30000×+20000');
-      expect(evaluate(e), 100000); // 아직 곱할 수 없으면 무시하고 계산
-      final (e2, _) = editInPart(e, 1, '2')!;
-      expect(e2, '50000+30000×2+20000');
-      expect(evaluate(e2), 130000);
+    test('가운데 숫자 뒤에 × 를 누르면 새 숫자 자리가 생기고, 숫자를 넣으면 들어간다', () {
+      var r = editToken('50000+8000+2500', 2, null, '×')!;
+      expect(r, (expr: '50000+8000×+2500', tok: 2, pending: 4));
+      expect(evaluate(r.expr), 60500); // 걸린 × 는 계산에서 무시
+      r = editToken(r.expr, r.tok, r.pending, '3')!;
+      expect(r, (expr: '50000+8000×3+2500', tok: 4, pending: null));
+      r = editToken('50000+8000×+2500', 2, 4, 'back')!;
+      expect(r, (expr: '50000+8000+2500', tok: 2, pending: null));
+      r = editToken('50000+8000×+2500', 2, 4, opSub)!;
+      expect(r.expr, '50000+8000−+2500');
     });
 
-    test('+, −, =, C 는 그 금액이 아니라 평소처럼', () {
-      expect(editInPart('5+3+2', 0, opAdd), isNull);
-      expect(editInPart('5+3+2', 0, 'C'), isNull);
+    test('마지막 숫자를 고르면 끝에 이어 쓰기(null)', () {
+      expect(editToken('5+3', 2, null, '1'), (
+        expr: '5+31',
+        tok: null,
+        pending: null,
+      ));
+      expect(editToken('5+3', 2, null, opAdd), (
+        expr: '5+3+',
+        tok: null,
+        pending: null,
+      ));
     });
 
-    test('끝에 붙은 연산자는 그대로', () {
-      expect(editInPart('50000+30000+', 0, 'back'), ('5000+30000+', 0));
+    test('C, = 는 여기서 처리하지 않음 → 평소처럼', () {
+      expect(editToken(e, 0, null, 'C'), isNull);
+      expect(editToken(e, 0, null, '='), isNull);
+    });
+
+    test('cleanExpr: 중간에 걸린 연산자 정리', () {
+      expect(cleanExpr('50000+8000×+2500'), '50000+8000+2500');
+      expect(cleanExpr('+5'), '5');
+      expect(cleanExpr('5+'), '5+');
     });
   });
 }

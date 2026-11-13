@@ -77,9 +77,10 @@ class RateChip extends StatelessWidget {
                     height: 8,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
+                      // 빨강: 못 받음 · 노랑: 2일 넘게 지난 환율이거나 직접 입력 · 초록: 최근 값
                       color: failed || s.rate == null
                           ? p.danger
-                          : s.source == RateSource.manual
+                          : s.source == RateSource.manual || s.rateStale
                           ? p.gold
                           : const Color(0xFF2EAD6B),
                     ),

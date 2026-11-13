@@ -196,6 +196,14 @@ class _InputCard extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // 고른 숫자를 읽기 쉽게 (고르는 동안만)
+                  if (s.selectedNumber case final n?)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: _ReadingTag(
+                        '${koreanUnit(n).isEmpty ? fmt(n) : koreanUnit(n)}${s.from.unit}',
+                      ),
+                    ),
                   IconButton(
                     tooltip: '최근 계산',
                     visualDensity: VisualDensity.compact,
@@ -253,24 +261,31 @@ class _InputCard extends StatelessWidget {
                     // 금액 말고 빈 곳을 누르면 다시 맨 끝에 이어 쓰기
                     : GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => s.selectPart(null),
-                        child: TermsView(
-                          child: TermColumns(
-                            expr: s.expr,
-                            from: s.from,
-                            convert: s.rate == null
-                                ? null
-                                : (v) => s.convert(v, s.from),
-                            topSize: 34,
-                            bottomSize: 19,
-                            cursor: true,
-                            // 금액을 누르면 그 금액을 고친다 (⌫·숫자가 그 금액에)
-                            editPart: s.editPart,
-                            onTapPart: (i) {
-                              HapticFeedback.selectionClick();
-                              s.selectPart(s.editPart == i ? null : i);
-                            },
-                          ),
+                        onTap: () => s.selectTok(null),
+                        child: Stack(
+                          children: [
+                            TermsView(
+                              child: TermColumns(
+                                expr: s.expr,
+                                from: s.from,
+                                convert: s.rate == null
+                                    ? null
+                                    : (v) => s.convert(v, s.from),
+                                topSize: 34,
+                                bottomSize: 19,
+                                cursor: true,
+                                // 금액을 누르면 그 금액을 고친다 (⌫·숫자가 그 금액에)
+                                editTok: s.editTok,
+                                pendingTok: s.editPending == null
+                                    ? null
+                                    : s.editPending! - 1,
+                                onTapTok: (i) {
+                                  HapticFeedback.selectionClick();
+                                  s.selectTok(s.editTok == i ? null : i);
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
               ),
@@ -305,9 +320,7 @@ class _InputCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: v == null
-                        ? p.danger
-                        : currencyAccent(s.from.other, p),
+                    color: p.danger,
                     fontFeatures: tabular,
                   ),
                 ),
@@ -866,139 +879,143 @@ class _ResultCard extends StatelessWidget {
     }
 
     final colors = currencyGradient(to, p, Theme.of(context).brightness);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 380),
-      curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.last.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
+    // 누르면 살짝 눌렸다 돌아온다 (복사됐다는 손맛)
+    return PressScale(
+      enabled: r != null && r > 0,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          onTap: r == null || r <= 0
-              ? (s.rate == null ? () => showRateSheet(context) : null)
-              : () {
-                  Clipboard.setData(ClipboardData(text: fmt(r)));
-                  HapticFeedback.lightImpact();
-                  toast(context, '${fmt(r)}${to.unit} 복사했어요');
-                },
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-            child: _SwapSlide(
-              value: to,
-              fromBelow: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _CardLabel(
-                    to,
-                    onNavy: true,
-                    trailing: Icon(
-                      Icons.copy_rounded,
-                      size: 18,
-                      color: p.onNavyMuted,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: colors,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: colors.last.withValues(alpha: 0.28),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: r == null || r <= 0
+                ? (s.rate == null ? () => showRateSheet(context) : null)
+                : () {
+                    Clipboard.setData(ClipboardData(text: fmt(r)));
+                    HapticFeedback.mediumImpact();
+                    toast(context, '${fmt(r)}${to.unit} 복사했어요');
+                  },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+              child: _SwapSlide(
+                value: to,
+                fromBelow: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _CardLabel(
+                      to,
+                      onNavy: true,
+                      trailing: Icon(
+                        Icons.copy_rounded,
+                        size: 18,
+                        color: p.onNavyMuted,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        // 결과가 바뀔 때 살짝 올라오며 바뀐다
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeIn,
-                          layoutBuilder: (current, previous) => Stack(
-                            alignment: Alignment.centerRight,
-                            children: [...previous, ?current],
-                          ),
-                          transitionBuilder: (child, a) => FadeTransition(
-                            opacity: a,
-                            child: SlideTransition(
-                              position: Tween(
-                                begin: const Offset(0, 0.25),
-                                end: Offset.zero,
-                              ).animate(a),
-                              child: child,
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          // 결과가 바뀔 때 살짝 올라오며 바뀐다
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeIn,
+                            layoutBuilder: (current, previous) => Stack(
+                              alignment: Alignment.centerRight,
+                              children: [...previous, ?current],
+                            ),
+                            transitionBuilder: (child, a) => FadeTransition(
+                              opacity: a,
+                              child: SlideTransition(
+                                position: Tween(
+                                  begin: const Offset(0, 0.25),
+                                  end: Offset.zero,
+                                ).animate(a),
+                                child: child,
+                              ),
+                            ),
+                            child: Text(
+                              big,
+                              key: ValueKey(big),
+                              style: TextStyle(
+                                fontSize: 42,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.2,
+                                color: s.expr.isEmpty
+                                    ? p.onNavyMuted.withValues(alpha: 0.7)
+                                    : p.onNavy,
+                                fontFeatures: tabular,
+                              ),
                             ),
                           ),
-                          child: Text(
-                            big,
-                            key: ValueKey(big),
+                        ),
+                      ),
+                    ),
+                    // 아래 줄: 왼쪽 넣은 금액 합계(동) → 오른쪽 어림값(원)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        if (s.expr.isNotEmpty && s.inputValue != null)
+                          Text(
+                            '= ${fmt(s.inputValue!)}${s.from.unit}',
+                            maxLines: 1,
                             style: TextStyle(
-                              fontSize: 42,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1.2,
-                              color: s.expr.isEmpty
-                                  ? p.onNavyMuted.withValues(alpha: 0.7)
-                                  : p.onNavy,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: p.onNavy.withValues(alpha: 0.92),
+                              fontFeatures: tabular,
+                            ),
+                          ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            subs.join('  ·  '),
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: p.onNavyMuted,
                               fontFeatures: tabular,
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ),
-                  // 아래 줄: 왼쪽 넣은 금액 합계(동) → 오른쪽 어림값(원)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      if (s.expr.isNotEmpty && s.inputValue != null)
-                        Text(
-                          '= ${fmt(s.inputValue!)}${s.from.unit}',
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: p.onNavy.withValues(alpha: 0.92),
-                            fontFeatures: tabular,
-                          ),
-                        ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          subs.join('  ·  '),
-                          textAlign: TextAlign.right,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: p.onNavyMuted,
-                            fontFeatures: tabular,
-                          ),
+                    if (feeLine != null)
+                      Text(
+                        feeLine,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: p.gold,
+                          fontFeatures: tabular,
                         ),
                       ),
-                    ],
-                  ),
-                  if (feeLine != null)
-                    Text(
-                      feeLine,
-                      textAlign: TextAlign.right,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: p.gold,
-                        fontFeatures: tabular,
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1450,6 +1467,33 @@ class _PanelPill extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 고른 숫자를 "25만 6,000동"처럼 읽어 주는 작은 금색 표
+class _ReadingTag extends StatelessWidget {
+  const _ReadingTag(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: p.gold.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: p.goldText,
+          fontFeatures: tabular,
         ),
       ),
     );

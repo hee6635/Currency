@@ -55,7 +55,9 @@ class _RateSheetState extends State<_RateSheet> {
     String sourceText;
     switch (s.source) {
       case RateSource.api:
-        sourceText = '${fmtTime(s.rateTime!)} 기준 · 하루 1번 갱신되는 시장 중간값';
+        sourceText = s.rateStale
+            ? '${s.rateAgeText} (${fmtTime(s.rateTime!)} 기준) · 인터넷이 되면 "최신 환율 가져오기"를 눌러 주세요'
+            : '${fmtTime(s.rateTime!)} 기준 · 하루 1번 갱신되는 시장 중간값';
       case RateSource.manual:
         sourceText = '${fmtTime(s.rateTime!)}에 직접 입력한 값';
       case RateSource.none:
