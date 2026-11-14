@@ -130,6 +130,10 @@ class AppState extends ChangeNotifier {
     from = p.getString('from') == 'krw' ? Currency.krw : Currency.vnd;
     memo = p.getString('memo') ?? defaultMemo;
     history = CalcHistory.decode(p.getString('history'));
+    // 음량 ↓ 로 말로 입력되는 걸 처음 몇 번만 알려준다 (써 봤으면 그만)
+    final opens = (p.getInt('opens') ?? 0) + 1;
+    p.setInt('opens', opens);
+    showVolumeHint = opens <= 3 && !(p.getBool('usedVolumeKey') ?? false);
     loaded = true;
     if (rate != null) {
       PlatformBridge.updateWidget(
@@ -224,6 +228,15 @@ class AppState extends ChangeNotifier {
     final toks = exprTokens(expr);
     if (t < 0 || t >= toks.length || isOperator(toks[t])) return null;
     return int.tryParse(toks[t]);
+  }
+
+  /// 지금 손대고 있는 숫자: 고른 숫자가 있으면 그것, 아니면 맨 끝에 입력 중인 숫자
+  int? get activeNumber {
+    final sel = selectedNumber;
+    if (sel != null) return sel;
+    final toks = exprTokens(expr);
+    if (toks.isEmpty || isOperator(toks.last)) return null;
+    return int.tryParse(toks.last);
   }
 
   void selectTok(int? i) {
@@ -441,6 +454,16 @@ class AppState extends ChangeNotifier {
   /// 앱의 환산 화면이 보이는 동안: 음량 버튼으로 바로 말하기 (음성 창 없이도)
   bool calcVolumeKeys = false;
 
+  /// "음량 ↓ 를 누르고 있으면 바로 말로 입력돼요" 안내를 보여줄지 (처음 3번, 써 보기 전까지)
+  bool showVolumeHint = false;
+
+  void dismissVolumeHint() {
+    if (!showVolumeHint) return;
+    showVolumeHint = false;
+    _prefs?.setBool('usedVolumeKey', true);
+    notifyListeners();
+  }
+
   void setCalcVolumeKeys(bool on) {
     if (calcVolumeKeys == on) return;
     calcVolumeKeys = on;
@@ -458,6 +481,10 @@ class AppState extends ChangeNotifier {
     if (!voiceMode && !calcVolumeKeys) return;
     switch (key) {
       case 'talkDown':
+        if (showVolumeHint) {
+          showVolumeHint = false;
+          _prefs?.setBool('usedVolumeKey', true);
+        }
         if (!voiceMode) openVoice();
         HapticFeedback.selectionClick();
         pressTalk((_) {}); // 알릴 말은 음성 창 안에 보인다

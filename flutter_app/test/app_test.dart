@@ -197,4 +197,19 @@ void main() {
     expect(s.rateStale, isFalse);
     expect(s.rateAgeText, isNull);
   });
+
+  test('음량 버튼 안내: 처음 3번만, 써 보면 그만', () async {
+    var s = await makeState();
+    expect(s.showVolumeHint, isTrue);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('opens'), 1);
+    s.setCalcVolumeKeys(true);
+    s.onHardwareKey('deleteOne'); // 음량 ↑ 는 안내와 무관
+    expect(s.showVolumeHint, isTrue);
+    s.dismissVolumeHint();
+    expect(s.showVolumeHint, isFalse);
+    expect(prefs.getBool('usedVolumeKey'), isTrue);
+    s = await makeState(saved: {'opens': 5});
+    expect(s.showVolumeHint, isFalse);
+  });
 }

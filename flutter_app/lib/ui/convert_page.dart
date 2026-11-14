@@ -22,9 +22,10 @@ class ConvertPage extends StatelessWidget {
     return Stack(
       children: [
         _convertBody(),
-        // 말로 입력한 뒤 3초 동안 크게 보여주는 확인 화면
         // 음성 모드: 네모 창이 떠 있고, 버튼을 누르고 있는 동안만 듣는다
         const Positioned.fill(child: VoicePanel()),
+        // 처음 몇 번: 음량 ↓ 로도 말로 입력된다는 말풍선 (말로 입력 버튼 아래)
+        const Positioned(top: 62, right: 12, child: _VolumeHint()),
       ],
     );
   }
@@ -37,7 +38,6 @@ class ConvertPage extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
           // 아주 좁은 화면(폴드 바깥 화면 등)에서는 환율 칩이 조금 작아진다
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Flexible(
                 child: FittedBox(
@@ -46,7 +46,8 @@ class ConvertPage extends StatelessWidget {
                   child: RateChip(),
                 ),
               ),
-              SizedBox(width: 8),
+              // 가운데 빈자리: 지금 입력 중인(또는 고른) 숫자를 "2만 7,000동"으로
+              Expanded(child: _ActiveReading()),
               _MicButton(),
             ],
           ),
@@ -196,14 +197,6 @@ class _InputCard extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 고른 숫자를 읽기 쉽게 (고르는 동안만)
-                  if (s.selectedNumber case final n?)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: _ReadingTag(
-                        '${koreanUnit(n).isEmpty ? fmt(n) : koreanUnit(n)}${s.from.unit}',
-                      ),
-                    ),
                   IconButton(
                     tooltip: '최근 계산',
                     visualDensity: VisualDensity.compact,
@@ -1503,4 +1496,120 @@ class _ReadingTag extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 머리말 가운데: 입력 중인 숫자를 읽기 쉽게 ("2만 7,000동"). 1만 미만은 숫자 그대로.
+class _ActiveReading extends StatelessWidget {
+  const _ActiveReading();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final n = s.listening ? null : s.activeNumber;
+    final text = n == null || n == 0
+        ? ''
+        : '${koreanUnit(n).isEmpty ? fmt(n) : koreanUnit(n)}${s.from.unit}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Center(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          child: text.isEmpty
+              ? const SizedBox.shrink()
+              : FittedBox(
+                  key: ValueKey(text),
+                  fit: BoxFit.scaleDown,
+                  child: _ReadingTag(text),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "음량 ↓ 를 누르고 있으면 바로 말로 입력돼요" 말풍선. 누르거나 써 보면 사라진다.
+class _VolumeHint extends StatelessWidget {
+  const _VolumeHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = context.palette;
+    final show = s.showVolumeHint && !s.voiceMode;
+    return IgnorePointer(
+      ignoring: !show,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 250),
+        opacity: show ? 1 : 0,
+        child: GestureDetector(
+          onTap: s.dismissVolumeHint,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 28),
+                child: CustomPaint(
+                  size: const Size(14, 8),
+                  painter: _BubbleTip(p.navy),
+                ),
+              ),
+              Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                decoration: BoxDecoration(
+                  color: p.navy,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.volume_down_rounded, color: p.gold, size: 20),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '음량 ↓ 누르고 있으면 말로 입력\n음량 ↑ 는 하나 지우기',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: p.onNavy,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(Icons.close_rounded, color: p.onNavyMuted, size: 18),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BubbleTip extends CustomPainter {
+  _BubbleTip(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, size.height)
+      ..lineTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_BubbleTip old) => old.color != color;
 }
