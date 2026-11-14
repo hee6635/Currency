@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 /// 숫자 표시: 새로 붙은 글자만 아래에서 살짝 올라오며 나타난다.
@@ -159,29 +161,46 @@ class _PressableKeyState extends State<PressableKey>
     reverseDuration: const Duration(milliseconds: 380),
   );
 
-  void _down() => _c.forward();
-  void _up() => _c.reverse();
+  /// 지금 이 키를 누르고 있는 손가락들 (두 손가락이 겹쳐도 각각 센다)
+  final _down = <int>{};
+  Timer? _long;
 
   @override
   void dispose() {
+    _long?.cancel();
     _c.dispose();
     super.dispose();
   }
 
+  // 누르는 순간 바로 입력한다 (뗄 때가 아니라). 빠르게 칠 때 손가락이 겹쳐도
+  // 한 번씩 씹히지 않고, 반응도 바로 온다.
+  void _onDown(PointerDownEvent e) {
+    _down.add(e.pointer);
+    _c.forward();
+    widget.onTap();
+    if (widget.onLongPress != null) {
+      _long?.cancel();
+      _long = Timer(const Duration(milliseconds: 450), () {
+        if (_down.contains(e.pointer)) widget.onLongPress!();
+      });
+    }
+  }
+
+  void _onUp(int pointer) {
+    _down.remove(pointer);
+    if (_down.isEmpty) {
+      _long?.cancel();
+      _c.reverse();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Listener(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _down(),
-      onTapUp: (_) => _up(),
-      onTapCancel: _up,
-      onTap: widget.onTap,
-      onLongPress: widget.onLongPress == null
-          ? null
-          : () {
-              widget.onLongPress!();
-              _up();
-            },
+      onPointerDown: _onDown,
+      onPointerUp: (e) => _onUp(e.pointer),
+      onPointerCancel: (e) => _onUp(e.pointer),
       child: AnimatedBuilder(
         animation: _c,
         builder: (context, child) {

@@ -1218,7 +1218,12 @@ class _Key extends StatelessWidget {
           HapticFeedback.selectionClick();
           s.press(k);
         },
-        onLongPress: kind == _KeyKind.back ? () => s.press('C') : null,
+        onLongPress: kind == _KeyKind.back
+            ? () {
+                HapticFeedback.mediumImpact();
+                s.press('C');
+              }
+            : null,
         child: child,
       ),
     );
