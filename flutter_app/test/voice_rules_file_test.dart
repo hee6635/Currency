@@ -51,4 +51,15 @@ void main() {
     expect(say('오만 동'), '50000');
     expect(say('삼천 동'), '3000');
   });
+
+  test('v5: 숫자 뒤 안동·번동·인동 → 만 동, 그만은 무시', () {
+    String say(String t) => applySpoken('', t, addMode: true).expr;
+    expect(say('12안동'), '120000');
+    expect(say('14안동'), '140000');
+    expect(say('1085번동'), '10850000');
+    expect(say('10인동'), '100000');
+    expect(say('49 운동'), '490000');
+    expect(applySpoken('', '그만', addMode: true).changed, isFalse);
+    expect(say('12만 동'), '120000');
+  });
 }

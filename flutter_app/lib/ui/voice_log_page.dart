@@ -21,21 +21,21 @@ class VoiceLogPage extends StatelessWidget {
   final AppState state;
 
   /// GitHub 이슈 작성 화면을 기록이 채워진 채로 연다 (로그인된 계정으로 "Submit"만 누르면 됨).
-  /// 앱 안에 GitHub 열쇠를 넣지 않기 위해 이렇게 한다. 4시간마다 AI가 읽고 보정 규칙을 고친다.
+  /// 앱 안에 GitHub 열쇠를 넣지 않기 위해 이렇게 한다.
+  /// 이제 인식이 잘 되므로 "틀림"으로 표시한 것과 가르친 말만 보낸다. 주소가 너무 길면
+  /// 브라우저가 열지 못하므로 약 1,800자까지만 담는다.
   Future<void> _upload(BuildContext context) async {
-    if (log.entries.isEmpty) return toast(context, '기록이 없어요');
+    final wrong = log.entries.reversed.where((e) => e.wrong).toList();
+    if (wrong.isEmpty && state.learned.isEmpty) {
+      return toast(context, '"틀림"으로 표시한 기록이 없어요 (기록을 길게 누르면 표시돼요)');
+    }
     final now = DateTime.now();
     String two(int n) => n.toString().padLeft(2, '0');
-    // 주소 길이 제한 때문에 틀린·실패한 것 우선, 최근 것부터 약 5,000자까지
     final pick = <VoiceLogEntry>[];
     var len = 0;
-    final pool = [
-      ...log.entries.reversed.where((e) => e.wrong || e.failed),
-      ...log.entries.reversed.where((e) => !(e.wrong || e.failed)),
-    ];
-    for (final e in pool) {
+    for (final e in wrong) {
       final t = e.toText();
-      if (len + t.length > 5000) break;
+      if (len + t.length > 1800) break;
       pick.add(e);
       len += t.length + 1;
     }
@@ -44,7 +44,7 @@ class VoiceLogPage extends StatelessWidget {
         .join(', ');
     final body = [
       '<!-- voice-log -->',
-      '앱에서 보낸 음성 기록이에요. (전체 ${log.entries.length}개 중 ${pick.length}개, 틀린·실패한 것 먼저)',
+      '틀렸다고 표시한 음성 기록 ${pick.length}개 (전체 ${log.entries.length}개 중)',
       '',
       '```',
       for (final e in pick) e.toText(),
@@ -54,12 +54,20 @@ class VoiceLogPage extends StatelessWidget {
     ].join('\n');
     final url = Uri.https('github.com', '/hee6635/Currency/issues/new', {
       'title':
-          '[voice-log] 음성 기록 ${now.year}-${two(now.month)}-${two(now.day)} ${two(now.hour)}:${two(now.minute)} (${pick.length}개)',
-      'labels': 'voice-log',
+          '[voice-log] 틀린 기록 ${now.year}-${two(now.month)}-${two(now.day)} ${two(now.hour)}:${two(now.minute)} (${pick.length}개)',
       'body': body,
     });
-    final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) toast(context, 'GitHub 화면을 열 수 없어요');
+    var ok = false;
+    try {
+      ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!ok) {
+      // 브라우저를 못 열면 내용을 복사해 두어 직접 붙여넣을 수 있게
+      await Clipboard.setData(ClipboardData(text: body));
+      if (context.mounted) {
+        toast(context, 'GitHub 화면을 열 수 없어 내용을 복사했어요. 이슈에 붙여넣어 주세요');
+      }
+    }
   }
 
   Future<void> _backup(BuildContext context) async {
@@ -138,7 +146,7 @@ class VoiceLogPage extends StatelessWidget {
             surfaceTintColor: Colors.transparent,
             actions: [
               IconButton(
-                tooltip: 'GitHub에 기록 올리기',
+                tooltip: '틀린 기록만 GitHub에 올리기',
                 icon: const Icon(Icons.cloud_upload_outlined),
                 onPressed: () => _upload(context),
               ),
@@ -176,7 +184,7 @@ class VoiceLogPage extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '누르면 원래 숫자 가르치기 · 길게 누르면 "틀림" · ☁ GitHub에 올리기 · 백업하면 앱 안 기록은 비워요',
+                        '누르면 원래 숫자 가르치기 · 길게 누르면 "틀림" · ☁ 틀린 것만 GitHub에 올리기 · 백업하면 앱 안 기록은 비워요',
                         style: TextStyle(fontSize: 12, color: p.muted),
                       ),
                     ),
